@@ -1,0 +1,62 @@
+<?xml version="1.0" standalone="yes"?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name "u-manager-companion">
+<!ENTITY author "jandrop">
+<!ENTITY version "2026.05.14">
+<!ENTITY plgdir "/boot/config/plugins/&name;">
+<!ENTITY github "jandrop/u-manager-companion">
+<!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
+]>
+
+<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0">
+
+<CHANGES>
+###2026.05.14
+- Initial release.
+- Patches the Unraid GraphQL API at boot to expose network device data
+  (info.devices.network) and add the systemMetricsNetwork subscription.
+- See upstream tracking issue: https://github.com/unraid/api/issues/1818
+</CHANGES>
+
+<!-- Fetch the patch script from GitHub on every install/upgrade -->
+<FILE Name="&plgdir;/patch.py">
+<URL>https://raw.githubusercontent.com/&github;/main/scripts/patch.py</URL>
+</FILE>
+
+<FILE Name="&plgdir;/apply.sh" Mode="0755">
+<URL>https://raw.githubusercontent.com/&github;/main/scripts/apply.sh</URL>
+</FILE>
+
+<!-- Run the patcher on install AND on every boot (Unraid replays plg install on boot) -->
+<FILE Run="/bin/bash">
+<INLINE>
+echo ""
+echo "--------------------------------------------"
+echo " Installing &name; v&version;"
+echo "--------------------------------------------"
+echo ""
+chmod +x &plgdir;/apply.sh
+&plgdir;/apply.sh
+echo ""
+echo " &name; installed."
+echo " GraphQL API has been patched."
+echo "--------------------------------------------"
+echo ""
+</INLINE>
+</FILE>
+
+<!-- Cleanup on uninstall: we can't undo the runtime patches but we remove our files;
+     the next reboot will load the pristine API bundle from squashfs. -->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+rm -rf &plgdir;
+echo ""
+echo "--------------------------------------------"
+echo " &name; removed."
+echo " Reboot Unraid to revert the API patches."
+echo "--------------------------------------------"
+echo ""
+</INLINE>
+</FILE>
+
+</PLUGIN>
