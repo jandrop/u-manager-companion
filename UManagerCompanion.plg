@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.14">
+<!ENTITY version "2026.05.14.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -23,11 +23,14 @@
 <URL>https://raw.githubusercontent.com/&github;/main/scripts/patch.py</URL>
 </FILE>
 
-<FILE Name="&plgdir;/apply.sh" Mode="0755">
+<FILE Name="&plgdir;/apply.sh">
 <URL>https://raw.githubusercontent.com/&github;/main/scripts/apply.sh</URL>
 </FILE>
 
-<!-- Run the patcher on install AND on every boot (Unraid replays plg install on boot) -->
+<!-- Run the patcher on install AND on every boot (Unraid replays plg install on
+     boot). Invoke apply.sh via bash because /boot is a FAT filesystem and
+     never honours the executable bit, so `chmod +x` is a no-op and direct
+     execution fails with "Permission denied". -->
 <FILE Run="/bin/bash">
 <INLINE>
 echo ""
@@ -35,11 +38,9 @@ echo "--------------------------------------------"
 echo " Installing &name; v&version;"
 echo "--------------------------------------------"
 echo ""
-chmod +x &plgdir;/apply.sh
-&plgdir;/apply.sh
+bash &plgdir;/apply.sh
 echo ""
 echo " &name; installed."
-echo " GraphQL API has been patched."
 echo "--------------------------------------------"
 echo ""
 </INLINE>
