@@ -1,57 +1,18 @@
 # U-Manager Companion
 
-Unraid plugin that patches the official `unraid-api` GraphQL service to fix
-gaps that currently block U-Manager features. Each patch tracks an upstream
-PR — once those land, this plugin becomes unnecessary.
+An Unraid plugin that monkey-patches the official `unraid-api` GraphQL
+bundle on boot to expose data the [U-Manager](https://u-manager.app)
+mobile app needs but that upstream either ships as a stub or has a
+real-time bug. Each patch is independently idempotent and disappears
+naturally once upstream merges the equivalent fix.
 
-## What it does
+> **Why a plugin, not just a config?** Unraid rebuilds
+> `/usr/local/unraid-api/` from a read-only squashfs image on every
+> boot. Anything we edit there evaporates on reboot or `unraid-api`
+> upgrade. The plugin's `apply.sh` script runs on every boot, so the
+> patches are re-applied automatically and silently.
 
-The plugin re-applies the following patches at every boot (Unraid resets
-`/usr/local/unraid-api/` from the squashfs image on each restart):
-
-### Network device monitoring
-
-1. **`info.devices.network`** — implements the stubbed `generateNetwork()` so
-   the query returns real interfaces with:
-   - `status` (`connected` / `disconnected` / `unknown`)
-   - `ipAddress`, `type` (ethernet / bridge / bond / other)
-   - `vendor` and `model` (resolved by traversing `bridge → bond.active_slave →
-     physical NIC` and looking up `lspci -mm`)
-   - `rxBytes` / `txBytes` — cumulative bytes from `/proc/net/dev`
-   - `rxBytesPerSec` / `txBytesPerSec` — instantaneous speed (1 s sample)
-2. **`metrics.network` query** — same payload as the subscription, suitable for
-   one-off lookups.
-3. **`systemMetricsNetwork` subscription** — emits a snapshot every second so
-   the app can draw live throughput graphs without polling.
-
-Virtual Docker interfaces (`veth*`, `br-<hash>`, `docker0`) are filtered out.
-
-### Subscription auth fix (CSRF)
-
-4. **`auth.service` CSRF patch** — fixes a `TypeError: Cannot read properties
-   of undefined (reading 'csrf_token')` that crashed every WebSocket
-   subscription authenticated with an API key. Adds optional chaining
-   (`request.query?.csrf_token`) so the cookie strategy fails cleanly and
-   Passport falls through to the API-key strategy instead of returning a
-   GraphQL error. Unblocks **all** subscriptions for API-key clients
-   (`dockerContainerStats`, `systemMetricsNetwork`, parity, etc.).
-
-### Real-time Docker stats
-
-5. **`DockerStatsService` override** — replaces the upstream `docker stats
-   --no-trunc` CLI consumer (which freezes `NetIO` / `BlockIO` counters at
-   the first sample for the rest of the process lifetime) with a per-container
-   stats stream over the Docker socket. After patching, CPU%, memory, network
-   I/O and block I/O update every ~600 ms instead of staying at `0 B/s`. A
-   Docker events listener adds and removes streams on `start` / `die` /
-   `kill` / `destroy` so newly started containers are tracked automatically.
-
-## Why a plugin?
-
-The Unraid root filesystem is built from a squashfs image at every boot. Any
-file we modify under `/usr/local/unraid-api/` is gone after a reboot or an
-unraid-api update. The plugin's install script runs on every boot, so the
-patches are re-applied automatically.
+---
 
 ## Install
 
@@ -61,39 +22,194 @@ In the Unraid WebGUI → **Plugins** → **Install Plugin**, paste:
 https://raw.githubusercontent.com/jandrop/u-manager-companion/main/UManagerCompanion.plg
 ```
 
-Click **INSTALL**.
+Click **INSTALL**. The patches apply immediately; the `unraid-api`
+service restarts so changes take effect.
 
-## Upstream
+To update later, click **CHECK FOR UPDATES** on the Plugins tab —
+the `.plg` is fetched fresh from this repo on every install/upgrade,
+so anything committed to `main` propagates automatically.
 
-Each patch tracks an upstream fix:
+## Uninstall
 
-- **Network device monitoring** — https://github.com/unraid/api/issues/1818
-- **CSRF subscription auth** — fork branch `fix/csrf-subscription-auth`,
-  upstream PR pending
-- **Docker stats real-time** — fork branch `fix/docker-stats-cli-cache`,
-  upstream PR pending
+**Plugins** → **u-manager-companion** → **REMOVE**.
 
-When the upstream PR for a given patch is merged, that patch becomes a no-op
-on updated servers.
+The currently-patched bundle stays active until the next reboot. On
+the next boot, Unraid loads the pristine bundle from squashfs and no
+patch is reapplied (the plugin is gone), so the API returns to
+upstream behaviour without any further action.
+
+---
+
+## What it patches
+
+### 1. Network device monitoring — `info.devices.network` + `systemMetricsNetwork`
+
+- **Type:** mixed — bug fix (stubbed query) + feature add (new fields + new subscription)
+- **Upstream tracking:** [unraid/api#1818](https://github.com/unraid/api/issues/1818)
+- **Why U-Manager needs it:** the dashboard renders a Network Interfaces card with live up/down speed per interface (bond0, eth0, etc.). Without this patch, `info.devices.network` returns an empty array and there is no subscription to drive live updates — so the card has no data to show.
+
+The patch replaces the stubbed `DevicesService.generateNetwork()` with a real implementation that reads `/sys/class/net/`, walks `bond.active_slave` to resolve PCI slots, propagates the user-bridge IP (`br0` → bond0 / eth0), and samples `/proc/net/dev` twice (1 s apart) to compute per-second rates. It also adds a `metrics.network` resolver and a `systemMetricsNetwork` subscription that polls every second and publishes the same payload over the existing pubsub channel pattern.
+
+**Sample query** — one-off interface snapshot:
+
+```graphql
+query {
+  info {
+    devices {
+      network {
+        iface
+        type
+        status
+        ipAddress
+        speed
+        rxBytesPerSec
+        txBytesPerSec
+      }
+    }
+  }
+}
+```
+
+**Sample response** (real, from the dev server):
+
+```json
+{
+  "info": {
+    "devices": {
+      "network": [
+        {
+          "iface": "bond0",
+          "type": "bond",
+          "status": "connected",
+          "ipAddress": "192.168.1.132",
+          "speed": "10000 Mbps",
+          "rxBytesPerSec": 23819825,
+          "txBytesPerSec": 2018076
+        },
+        {
+          "iface": "eth0",
+          "type": "ethernet",
+          "status": "connected",
+          "ipAddress": null,
+          "speed": "1000 Mbps",
+          "rxBytesPerSec": 146,
+          "txBytesPerSec": 0
+        },
+        {
+          "iface": "lo",
+          "type": "loopback",
+          "status": "unknown",
+          "ipAddress": "127.0.0.1",
+          "speed": null,
+          "rxBytesPerSec": 7507,
+          "txBytesPerSec": 7507
+        }
+      ]
+    }
+  }
+}
+```
+
+**Sample subscription** — live snapshot every second:
+
+```graphql
+subscription {
+  systemMetricsNetwork {
+    id
+    interfaces {
+      iface
+      rxBytes
+      txBytes
+      rxBytesPerSec
+      txBytesPerSec
+    }
+  }
+}
+```
+
+The subscription emits the same `interfaces` array shape, plus
+cumulative `rxBytes` / `txBytes` so consumers can derive long-window
+averages without keeping their own state.
+
+---
+
+### 2. Real-time Docker container stats — `dockerContainerStats`
+
+- **Type:** bug fix
+- **Upstream tracking:** [unraid/api#2007](https://github.com/unraid/api/issues/2007) (bug) · [unraid/api#2008](https://github.com/unraid/api/issues/2008) (Work Intent)
+- **Why U-Manager needs it:** the Docker section renders one card per container with live CPU%, memory used / total, and ↑/↓ network speed. Without this patch the speed values stay frozen at `0 B/s` — the GraphQL subscription emits CPU and memory correctly but the cumulative `NetIO` / `BlockIO` strings never update, so the client can't derive a per-second rate.
+
+The root cause is upstream's `DockerStatsService` spawning `docker stats --no-trunc` and parsing each output line. The CLI's "live stream" mode never refreshes the cumulative counters between ticks — they stay at the snapshot taken when the process started. This patch replaces that spawn with a per-container `dockerode` stats stream straight off the Docker socket (which DOES refresh every sample), parses each chunk in TypeScript, and publishes the same `DockerContainerStats` shape on the same pubsub channel. Container lifecycle events (`start` / `die` / `stop` / `kill` / `destroy`) are tracked via the Docker events stream so new containers get a fresh socket and removed ones release theirs.
+
+**Sample subscription:**
+
+```graphql
+subscription {
+  dockerContainerStats {
+    id
+    cpuPercent
+    memUsage
+    memPercent
+    netIO
+    blockIO
+  }
+}
+```
+
+**Sample chunk** (one event per running container, ~1 s apart):
+
+```json
+{
+  "dockerContainerStats": {
+    "id": "a42869b5...:057622b839bd",
+    "cpuPercent": 5.5,
+    "memUsage": "2.04GiB / 62.60GiB",
+    "memPercent": 3.26,
+    "netIO": "44.04GiB / 205.47GiB",
+    "blockIO": "1.20GiB / 8.75GiB"
+  }
+}
+```
+
+Without the patch every successive emission for the same container
+would carry the same `netIO` value forever. With the patch the
+cumulative counters increase monotonically — clients can compute
+`(netIO[t] - netIO[t-1]) / Δt` to render real download / upload
+speeds per container.
+
+---
 
 ## How idempotency works
 
-`patch.py` is safe to re-run. Each patch is independent and uses its own
-marker so re-runs after a partial failure resume cleanly:
+`patch.py` is safe to re-run. Each patch is independent and uses its
+own marker so partial-failure recovery and unraid-api version bumps
+don't break anything:
 
-- The network patch detects already-patched bundles via `class NetworkUtilization
-  extends Node` and skips them.
-- The CSRF patch checks whether `request.query?.csrf_token` is already in the
-  bundle.
-- The Docker stats patch looks for the `/* u-manager-companion: docker-stats
-  override */` marker.
-- The bundle file is resolved dynamically (`plugin.module-*.js`) so it survives
-  unraid-api version bumps that change the bundle hash.
-- All decorator suffixes used by the NestJS metadata system are extracted from
-  the bundle at runtime, not hardcoded.
+- The **network** patch detects the already-patched bundle via the
+  presence of `class NetworkUtilization extends Node` and skips
+  unchanged. The shared pubsub enum patch adds
+  `GRAPHQL_PUBSUB_CHANNEL["NETWORK_UTILIZATION"]` only if it's not
+  already there.
+- The **Docker stats** patch looks for the
+  `/* u-manager-companion: docker-stats override */` marker
+  comment before re-applying.
+- The bundle filename is resolved dynamically (`plugin.module-*.js`)
+  so each `unraid-api` release that changes the bundle hash is
+  picked up automatically.
+- NestJS decorator suffixes (`_ts_decorate$XXX`,
+  `_ts_metadata$YYY`) are extracted from the bundle at runtime, not
+  hardcoded — the patches survive upstream's minification reshuffle
+  between releases.
 
-## Remove
+## Upstream lifecycle
 
-Uninstall via **Plugins** → **u-manager-companion** → **Remove**. The patches
-stay active until the next reboot, at which point the pristine API bundle is
-loaded from squashfs.
+This plugin is deliberately scoped to "fixes that block U-Manager and
+have no upstream release yet". When upstream merges a fix and ships
+a new `unraid-api` release that includes it, the matching idempotency
+marker in the new bundle will short-circuit our patch on the next
+boot — making the patch a no-op without any user action. At that
+point the patch can be removed from `patch.py` entirely in a future
+plugin release.
+
+If you'd like to help the upstream PRs land faster, give a 👍 on the
+linked issues above.
