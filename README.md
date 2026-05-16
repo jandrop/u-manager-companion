@@ -201,15 +201,3 @@ don't break anything:
   hardcoded — the patches survive upstream's minification reshuffle
   between releases.
 
-## Upstream lifecycle
-
-This plugin is deliberately scoped to "fixes that block U-Manager and
-have no upstream release yet". When upstream merges a fix and ships
-a new `unraid-api` release that includes it, the matching idempotency
-marker in the new bundle will short-circuit our patch on the next
-boot — making the patch a no-op without any user action. At that
-point the patch can be removed from `patch.py` entirely in a future
-plugin release.
-
-If you'd like to help the upstream PRs land faster, give a 👍 on the
-linked issues above.
