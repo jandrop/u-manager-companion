@@ -1,0 +1,74 @@
+{
+  "apps": 2,
+  "last_updated_timestamp": 1778955967,
+  "last_updated": "2026-05-16 19:46",
+  "categories": [
+    {
+      "Cat": "Tools-Utilities:",
+      "Des": "Tools and Utilities"
+    },
+    {
+      "Cat": "Plugins:",
+      "Des": "Plugins"
+    }
+  ],
+  "applist": [
+    {
+      "Plugin": true,
+      "Name": "U-Manager Push Agent",
+      "PluginURL": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/UManager.plg",
+      "PluginAuthor": "jandrop",
+      "Author": "jandrop",
+      "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/plugins/dynamix/icons/umanager.png",
+      "Overview": "Push notification agent for Unraid. Forwards Dynamix notifications (parity checks, UPS events, Docker, etc.) to the U-Manager mobile app via the U-Manager push relay. Install it on your Unraid server to receive real-time alerts on your phone, no port forwarding required.",
+      "Support": "https://github.com/jandrop/u-manager-unraid-plugin/issues",
+      "Project": "https://github.com/jandrop/u-manager-unraid-plugin",
+      "Repo": "U-Manager",
+      "Repository": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/UManager.plg",
+      "CategoryList": [
+        "Tools-Utilities",
+        "Plugins"
+      ],
+      "pluginVersion": "2026.05.07",
+      "ChangeLogPresent": "1",
+      "downloads": 0,
+      "FirstSeen": 1778955967,
+      "LastUpdateScan": 1778955967,
+      "trending": 0,
+      "topPerforming": 0
+    },
+    {
+      "Plugin": true,
+      "Name": "U-Manager Companion",
+      "PluginURL": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/UManagerCompanion.plg",
+      "PluginAuthor": "jandrop",
+      "Author": "jandrop",
+      "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/plugins/dynamix/icons/umanager.png",
+      "Overview": "Patches the Unraid GraphQL API at boot to expose extra fields that upstream has not yet shipped (per-interface network rates, plugin metadata). Required by the U-Manager mobile app to show full network metrics; installation is idempotent and reverts cleanly when the official API catches up.",
+      "Support": "https://github.com/jandrop/u-manager-companion/issues",
+      "Project": "https://github.com/jandrop/u-manager-companion",
+      "Repo": "U-Manager",
+      "Repository": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/UManagerCompanion.plg",
+      "CategoryList": [
+        "Tools-Utilities",
+        "Plugins"
+      ],
+      "pluginVersion": "2026.05.16.3",
+      "ChangeLogPresent": "0",
+      "downloads": 0,
+      "FirstSeen": 1778955967,
+      "LastUpdateScan": 1778955967,
+      "trending": 0,
+      "topPerforming": 0
+    }
+  ],
+  "repositories": [
+    {
+      "name": "U-Manager",
+      "url": "https://github.com/jandrop/u-manager-companion",
+      "author": "jandrop"
+    }
+  ],
+  "blacklisted": [],
+  "deprecated": []
+}
