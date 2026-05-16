@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.16.2">
+<!ENTITY version "2026.05.16.3">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,14 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0">
 
 <CHANGES>
+###2026.05.16.3
+- Remove the CSRF optional-chaining patch. An A/B test on the live
+  server (with and without the patch) confirmed it was not needed for
+  API-key authenticated subscriptions — Passport.js short-circuits the
+  cookie strategy when no cookie is present, so `request.query` is
+  never read. Removing the patch shrinks the plugin's footprint
+  without affecting U-Manager.
+
 ###2026.05.16.2
 - Fix frozen `NetIO` in the `dockerContainerStats` subscription. The
   upstream service spawns `docker stats` CLI which re-uses the first

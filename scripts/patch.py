@@ -598,42 +598,6 @@ def patch_bundle() -> bool:
     return True
 
 
-def patch_csrf_bundle() -> bool:
-    """Fix `request.query.csrf_token` → `request.query?.csrf_token` in
-    `auth.service` validation.
-
-    On WebSocket subscriptions the request object built by
-    `AuthenticationGuard.getRequest` has `headers` / `cookies` / `extra`
-    but no `query`. Reading `.csrf_token` on `undefined` throws a
-    `TypeError` that propagates up as a GraphQL error, blocking ALL
-    subscriptions for API-key clients (which is u_manager's only auth
-    mode).
-
-    The optional-chaining fix lets `validateCsrfToken` receive
-    `undefined`, fail cleanly with `Invalid CSRF token`, and allow
-    Passport to fall through to `ServerHeaderStrategy` (API-key auth),
-    which succeeds.
-
-    Tracked upstream: bug discovered locally on 2026-05-16, PR pending.
-    """
-    bundle = find_bundle()
-    if not bundle:
-        log("csrf patch: bundle not found")
-        return False
-    with open(bundle, "r") as f:
-        content = f.read()
-    target = "request.query.csrf_token"
-    fixed = "request.query?.csrf_token"
-    if target not in content:
-        # Either already patched (fixed in place) or upstream fixed it.
-        return False
-    content = content.replace(target, fixed)
-    with open(bundle, "w") as f:
-        f.write(content)
-    log(f"patched csrf optional-chaining in {bundle}")
-    return True
-
-
 DOCKER_STATS_MARKER = "/* u-manager-companion: docker-stats override */"
 
 
@@ -805,9 +769,8 @@ def restart_api() -> None:
 def main() -> int:
     changed_pubsub = patch_pubsub()
     changed_bundle = patch_bundle()
-    changed_csrf = patch_csrf_bundle()
     changed_docker_stats = patch_docker_stats_bundle()
-    if any([changed_pubsub, changed_bundle, changed_csrf, changed_docker_stats]):
+    if any([changed_pubsub, changed_bundle, changed_docker_stats]):
         restart_api()
         log("patches applied — unraid-api will restart")
     else:
