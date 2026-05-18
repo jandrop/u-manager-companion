@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.18.6">
+<!ENTITY version "2026.05.18.7">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,12 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.18.7
+- Auto-reapply patches when the unraid-api bundle gets replaced (e.g.
+  by Unraid Connect). A background `inotifywait` watcher detects new
+  bundle files and re-runs `apply.sh` within seconds, so the patches
+  no longer disappear until the next reboot.
+
 ###2026.05.18.6
 - Use polished U-Manager icon with transparent background in the Plugins page.
 
@@ -100,6 +106,10 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <URL>https://raw.githubusercontent.com/&github;/main/scripts/apply.sh</URL>
 </FILE>
 
+<FILE Name="&plgdir;/watcher.sh">
+<URL>https://raw.githubusercontent.com/&github;/main/scripts/watcher.sh</URL>
+</FILE>
+
 <!-- Run the patcher on install AND on every boot (Unraid replays plg install on
      boot). Invoke apply.sh via bash because /boot is a FAT filesystem and
      never honours the executable bit, so `chmod +x` is a no-op and direct
@@ -123,6 +133,8 @@ echo ""
      the next reboot will load the pristine API bundle from squashfs. -->
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
+# Stop the bundle watcher daemon if it's running.
+pkill -f "&plgdir;/watcher.sh" 2>/dev/null
 rm -rf &plgdir;
 rm -rf /usr/local/emhttp/plugins/&name;
 echo ""
