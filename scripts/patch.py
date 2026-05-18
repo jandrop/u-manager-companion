@@ -19,6 +19,10 @@ Patches applied:
      UI submits (cmdCheckResume/cmdCheckPause/cmdCheckCancel), so a paused
      parity check resumes from its saved position instead of restarting
      from zero.
+  6. Power mutations: add `shutdownServer`, `rebootServer` and `sleepServer`
+     to the GraphQL Mutation root. They shell out to /usr/local/sbin/powerdown
+     and the Dynamix S3 Sleep plugin's rc.s3sleep respectively, gated by the
+     same UPDATE_ANY / SERVERS permission as `updateServerIdentity`.
 
 Tracking issue (upstream): https://github.com/unraid/api/issues/1818
 """
@@ -870,6 +874,139 @@ def patch_parity_resume_bundle() -> bool:
     return True
 
 
+POWER_MUTATIONS_MARKER = "shutdownServer"
+
+
+def patch_power_mutations_bundle() -> bool:
+    """Add `shutdownServer`, `rebootServer` and `sleepServer` GraphQL mutations.
+
+    The upstream API has `updateServerIdentity` on the `Server` resolver but no
+    way to actually shut the box down, reboot it, or put it to sleep. This
+    injects three Boolean-returning mutations next to it, plus the matching
+    methods on `ServerService` that shell out to `/usr/local/sbin/powerdown`
+    and `rc.s3sleep`.
+
+    Tracked upstream: PR pending on the unraid-api fork.
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("power-mutations patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if POWER_MUTATIONS_MARKER in content:
+        return False
+
+    # Suffixes for the two classes — each lives in its own bundle scope,
+    # so the helper functions (_ts_decorate$X, _ts_metadata$Y) differ.
+    service_anchor = "}\nServerService = _ts_decorate$"
+    service_idx = content.find(service_anchor)
+    if service_idx == -1:
+        log("power-mutations patch: ServerService closer not found")
+        return False
+    # Extract just the suffix letters from "_ts_decorate$XXX("
+    end = content.find("(", service_idx + len(service_anchor))
+    service_suffix = content[service_idx + len(service_anchor) : end]
+
+    resolver_anchor = 'ServerResolver.prototype, "updateServerIdentity", null);'
+    resolver_suffix = find_decorator_suffix(content, resolver_anchor)
+    meta_suffix = find_metadata_suffix(content, resolver_anchor)
+    if not all([service_suffix, resolver_suffix, meta_suffix]):
+        log(
+            f"power-mutations patch: missing suffix "
+            f"(service={service_suffix} resolver={resolver_suffix} meta={meta_suffix})"
+        )
+        return False
+
+    # ── 1. New ServerService methods (just before the class closing brace) ──
+    service_methods = (
+        "    fireAndForget(command, args) {\n"
+        "        const subprocess = execa(command, args, { detached: true, stdio: 'ignore' });\n"
+        "        subprocess.unref();\n"
+        "    }\n"
+        "    async shutdownServer() {\n"
+        "        this.logger.log('Server shutdown requested via API');\n"
+        "        this.fireAndForget('/usr/local/sbin/powerdown', []);\n"
+        "        return true;\n"
+        "    }\n"
+        "    async rebootServer() {\n"
+        "        this.logger.log('Server reboot requested via API');\n"
+        "        this.fireAndForget('/usr/local/sbin/powerdown', ['-r']);\n"
+        "        return true;\n"
+        "    }\n"
+        "    async sleepServer() {\n"
+        "        const { existsSync } = await import('fs');\n"
+        "        const path = '/usr/local/emhttp/plugins/dynamix.s3.sleep/scripts/rc.s3sleep';\n"
+        "        if (!existsSync(path)) {\n"
+        "            throw new GraphQLError('Sleep is not available. Install the Dynamix S3 Sleep plugin to enable this feature.');\n"
+        "        }\n"
+        "        this.logger.log('Server sleep requested via API');\n"
+        "        this.fireAndForget(path, []);\n"
+        "        return true;\n"
+        "    }\n"
+    )
+    service_closer = f"}}\nServerService = _ts_decorate${service_suffix}(["
+    if service_closer not in content:
+        log("power-mutations patch: service closer anchor not found")
+        return False
+    content = content.replace(service_closer, service_methods + service_closer, 1)
+
+    # ── 2. New ServerResolver method bodies (just before updateServerIdentity) ──
+    resolver_methods = (
+        "    async shutdownServer() {\n"
+        "        return this.serverService.shutdownServer();\n"
+        "    }\n"
+        "    async rebootServer() {\n"
+        "        return this.serverService.rebootServer();\n"
+        "    }\n"
+        "    async sleepServer() {\n"
+        "        return this.serverService.sleepServer();\n"
+        "    }\n"
+        "    "
+    )
+    method_anchor = "async updateServerIdentity(name, comment, sysModel) {"
+    if method_anchor not in content:
+        log("power-mutations patch: resolver method anchor not found")
+        return False
+    content = content.replace(method_anchor, resolver_methods + method_anchor, 1)
+
+    # ── 3. Resolver decorators registering the new methods with NestJS ──
+    def make_decorator(method: str, description: str) -> str:
+        return (
+            f"_ts_decorate${resolver_suffix}([\n"
+            f"    Mutation(()=>Boolean, {{\n"
+            f"        description: '{description}'\n"
+            f"    }}),\n"
+            f"    UsePermissions({{\n"
+            f"        action: AuthAction.UPDATE_ANY,\n"
+            f"        resource: Resource.SERVERS\n"
+            f"    }}),\n"
+            f'    _ts_metadata${meta_suffix}("design:type", Function),\n'
+            f'    _ts_metadata${meta_suffix}("design:paramtypes", []),\n'
+            f'    _ts_metadata${meta_suffix}("design:returntype", Promise)\n'
+            f'], ServerResolver.prototype, "{method}", null);\n'
+        )
+
+    new_decorators = (
+        make_decorator("shutdownServer", "Cleanly stop the array and power the server off.")
+        + make_decorator("rebootServer", "Cleanly stop the array and reboot the server.")
+        + make_decorator(
+            "sleepServer",
+            "Put the server into S3 sleep. Requires the Dynamix S3 Sleep plugin.",
+        )
+    )
+
+    if resolver_anchor not in content:
+        log("power-mutations patch: resolver decorator anchor not found")
+        return False
+    content = content.replace(resolver_anchor, resolver_anchor + "\n" + new_decorators, 1)
+
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched power mutations in {os.path.basename(bundle)}")
+    return True
+
+
 def restart_api() -> None:
     try:
         with os.popen("pgrep -f 'node /usr/local/unraid-api'") as p:
@@ -887,7 +1024,15 @@ def main() -> int:
     changed_docker_stats = patch_docker_stats_bundle()
     changed_docker_logs = patch_docker_logs_bundle()
     changed_parity_resume = patch_parity_resume_bundle()
-    if any([changed_pubsub, changed_bundle, changed_docker_stats, changed_docker_logs, changed_parity_resume]):
+    changed_power = patch_power_mutations_bundle()
+    if any([
+        changed_pubsub,
+        changed_bundle,
+        changed_docker_stats,
+        changed_docker_logs,
+        changed_parity_resume,
+        changed_power,
+    ]):
         restart_api()
         log("patches applied — unraid-api will restart")
     else:

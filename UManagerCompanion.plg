@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.18.7">
+<!ENTITY version "2026.05.18.8">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,13 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.18.8
+- Add `shutdownServer`, `rebootServer` and `sleepServer` GraphQL
+  mutations. They shell out to `/usr/local/sbin/powerdown` and the
+  Dynamix S3 Sleep plugin's `rc.s3sleep`, gated by the same
+  UPDATE_ANY / SERVERS permission as `updateServerIdentity`. `sleepServer`
+  throws if the Dynamix S3 Sleep plugin isn't installed.
+
 ###2026.05.18.7
 - Auto-reapply patches when the unraid-api bundle gets replaced (e.g.
   by Unraid Connect). A background `inotifywait` watcher detects new
