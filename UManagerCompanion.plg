@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.18.1">
+<!ENTITY version "2026.05.18.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,18 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0">
 
 <CHANGES>
+###2026.05.18.2
+- Fix `parityCheck.resume` mutation restarting the parity check from
+  byte 0 instead of continuing from the saved position. The upstream
+  resolver posts `cmdCheck=Resume` to emhttpd, which identifies
+  actions by field NAME (not value), so it falls through to the plain
+  `cmdCheck` submit handler — a fresh check — and the saved
+  mdResyncPos is discarded. Patch realigns the field names with the
+  ones the Unraid web UI submits (`cmdCheckPause`/`cmdCheckResume`/
+  `cmdCheckCancel`). Verified live on Unraid 7.3.0: paused at
+  mdResyncPos=1655644, resumed → mdResyncPos=2395484 and growing.
+  Upstream: https://github.com/unraid/api/issues/1815
+
 ###2026.05.18.1
 - Fix empty `docker.logs` responses for containers that write to stderr
   (Python apps, Caddy, AdGuard Home, transmission, unbound, ...).
