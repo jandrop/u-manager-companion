@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.18.4">
+<!ENTITY version "2026.05.18.5">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,10 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.18.5
+- Show plugin description in the Plugins page (Unraid reads it from
+  the plugin's README.md, not from the .plg comment).
+
 ###2026.05.18.4
 - Show plugin description and Support link (GitHub Issues) in the
   Plugins page.
@@ -68,14 +72,20 @@
 - See upstream tracking issue: https://github.com/unraid/api/issues/1818
 </CHANGES>
 
-<!--
-Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mobile app needs.
--->
-
 <!-- Plugin icon shown in the Unraid Plugins page. Unraid looks for
      /usr/local/emhttp/plugins/<name>/<name>.png automatically. -->
 <FILE Name="/usr/local/emhttp/plugins/&name;/&name;.png">
 <URL>https://raw.githubusercontent.com/&github;/main/assets/icon.png</URL>
+</FILE>
+
+<!-- Plugin description shown in the Plugins page. Unraid renders the
+     contents of /usr/local/emhttp/plugins/<name>/README.md as Markdown. -->
+<FILE Name="/usr/local/emhttp/plugins/&name;/README.md">
+<INLINE>
+**&name;**
+
+Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mobile app needs.
+</INLINE>
 </FILE>
 
 <!-- Fetch the patch script from GitHub on every install/upgrade -->
