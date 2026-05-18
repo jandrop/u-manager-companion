@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.18.2">
+<!ENTITY version "2026.05.18.3">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,9 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0">
 
 <CHANGES>
+###2026.05.18.3
+- Add U-Manager logo as the plugin icon in the Plugins page.
+
 ###2026.05.18.2
 - Fix `parityCheck.resume` mutation restarting the parity check from
   byte 0 instead of continuing from the saved position. The upstream
@@ -61,6 +64,12 @@
 - See upstream tracking issue: https://github.com/unraid/api/issues/1818
 </CHANGES>
 
+<!-- Plugin icon shown in the Unraid Plugins page. Unraid looks for
+     /usr/local/emhttp/plugins/<name>/<name>.png automatically. -->
+<FILE Name="/usr/local/emhttp/plugins/&name;/&name;.png">
+<URL>https://raw.githubusercontent.com/&github;/main/assets/icon.png</URL>
+</FILE>
+
 <!-- Fetch the patch script from GitHub on every install/upgrade -->
 <FILE Name="&plgdir;/patch.py">
 <URL>https://raw.githubusercontent.com/&github;/main/scripts/patch.py</URL>
@@ -94,6 +103,7 @@ echo ""
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 rm -rf &plgdir;
+rm -rf /usr/local/emhttp/plugins/&name;
 echo ""
 echo "--------------------------------------------"
 echo " &name; removed."
