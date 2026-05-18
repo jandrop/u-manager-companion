@@ -179,6 +179,52 @@ speeds per container.
 
 ---
 
+### 3. Stderr logs for `docker.logs`
+
+- **Type:** bug fix
+- **Upstream tracking:** _(PR pending on the upstream fork)_
+- **Why U-Manager needs it:** the app renders a live log stream for each Docker container. Without this patch any container whose process writes its logs to stderr (most Python apps, Caddy, AdGuard Home, transmission, unbound, …) returns an empty `lines` array — the log view stays blank even though `docker logs <name>` shows plenty of output.
+
+Upstream's `DockerLogService.getContainerLogs()` shells out to `docker logs --timestamps --tail N <id>` via `execa` and only reads the resulting `.stdout` property. But `docker logs` faithfully forwards each container line on the original stream it was written to — so stderr-only containers contribute nothing to `.stdout`. The patch swaps to execa's `{ all: true }` mode, which merges stdout and stderr into a single `.all` buffer while keeping each line's `--timestamps` prefix intact, so the existing parser and the `since`-cursor logic keep working unchanged.
+
+**Sample query:**
+
+```graphql
+query {
+  docker {
+    logs(id: "<container-id>", tail: 5) {
+      containerId
+      cursor
+      lines {
+        timestamp
+        message
+      }
+    }
+  }
+}
+```
+
+**Sample response** (real, from `caddy` — a stderr-only container that returned `lines: []` before the patch):
+
+```json
+{
+  "docker": {
+    "logs": {
+      "containerId": "a42869b5...:a94ccb76b4fc",
+      "cursor": "2026-05-18T20:18:38.604Z",
+      "lines": [
+        {
+          "timestamp": "2026-05-18T20:18:38.604Z",
+          "message": "{\"level\":\"error\",\"ts\":1779135518.604777,\"logger\":\"tls.renew\",\"msg\":\"could not get certificate from issuer\",\"identifier\":\"starkindustries.homes\"}"
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
 ## How idempotency works
 
 `patch.py` is safe to re-run. Each patch is independent and uses its
@@ -193,6 +239,9 @@ don't break anything:
 - The **Docker stats** patch looks for the
   `/* u-manager-companion: docker-stats override */` marker
   comment before re-applying.
+- The **Docker logs stderr** patch uses the patched substring itself
+  as its marker (`{ all } = await execa('docker'`) — re-running on an
+  already-patched bundle is a no-op.
 - The bundle filename is resolved dynamically (`plugin.module-*.js`)
   so each `unraid-api` release that changes the bundle hash is
   picked up automatically.

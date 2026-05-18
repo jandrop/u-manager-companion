@@ -12,6 +12,9 @@ Patches applied:
      so it returns real interfaces with status, IP, vendor, model, traffic
      totals and current bytes-per-second.
   3. metrics.network query + systemMetricsNetwork subscription with 1s polling.
+  4. docker.logs resolver: capture both stdout and stderr from `docker logs`,
+     so containers that only emit on stderr (Python apps, Caddy, AdGuard, ...)
+     return their log lines instead of an empty array.
 
 Tracking issue (upstream): https://github.com/unraid/api/issues/1818
 """
@@ -755,6 +758,45 @@ def patch_docker_stats_bundle() -> bool:
     return True
 
 
+DOCKER_LOGS_OLD = (
+    "const { stdout } = await execa('docker', args);\n"
+    "            const lines = this.parseDockerLogOutput(stdout);"
+)
+DOCKER_LOGS_NEW = (
+    "const { all } = await execa('docker', args, { all: true });\n"
+    "            const lines = this.parseDockerLogOutput(all);"
+)
+
+
+def patch_docker_logs_bundle() -> bool:
+    """Capture both stdout and stderr in DockerLogService.getContainerLogs().
+
+    The upstream resolver shells out to `docker logs --timestamps --tail N
+    <id>` via execa and only reads `.stdout`. Containers that write to
+    stderr (most Python apps, Caddy, AdGuard, ...) return an empty array.
+
+    Switching to execa's `{ all: true }` mode merges both streams into
+    `.all` while keeping the per-line `--timestamps` prefix, so the
+    existing parser and cursor logic work unchanged.
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("docker-logs patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if DOCKER_LOGS_NEW in content:
+        return False
+    if DOCKER_LOGS_OLD not in content:
+        log("docker-logs patch: original getContainerLogs shape not found")
+        return False
+    content = content.replace(DOCKER_LOGS_OLD, DOCKER_LOGS_NEW, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched docker-logs stderr capture in {os.path.basename(bundle)}")
+    return True
+
+
 def restart_api() -> None:
     try:
         with os.popen("pgrep -f 'node /usr/local/unraid-api'") as p:
@@ -770,7 +812,8 @@ def main() -> int:
     changed_pubsub = patch_pubsub()
     changed_bundle = patch_bundle()
     changed_docker_stats = patch_docker_stats_bundle()
-    if any([changed_pubsub, changed_bundle, changed_docker_stats]):
+    changed_docker_logs = patch_docker_logs_bundle()
+    if any([changed_pubsub, changed_bundle, changed_docker_stats, changed_docker_logs]):
         restart_api()
         log("patches applied — unraid-api will restart")
     else:

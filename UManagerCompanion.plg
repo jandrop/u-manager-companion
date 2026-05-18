@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.16.3">
+<!ENTITY version "2026.05.18.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,15 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0">
 
 <CHANGES>
+###2026.05.18.1
+- Fix empty `docker.logs` responses for containers that write to stderr
+  (Python apps, Caddy, AdGuard Home, transmission, unbound, ...).
+  The upstream resolver shells out to `docker logs --timestamps` and
+  only reads stdout, so any container whose lines go to stderr returned
+  an empty array. Patch swaps to execa's `{ all: true }` mode so both
+  streams are merged while keeping the per-line timestamp prefix and
+  the existing cursor logic.
+
 ###2026.05.16.3
 - Remove the CSRF optional-chaining patch. An A/B test on the live
   server (with and without the patch) confirmed it was not needed for
