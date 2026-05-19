@@ -874,17 +874,17 @@ def patch_parity_resume_bundle() -> bool:
     return True
 
 
-POWER_MUTATIONS_MARKER = "shutdownServer"
+POWER_MUTATIONS_MARKER = "class ServerPowerMutations"
 
 
 def patch_power_mutations_bundle() -> bool:
-    """Add `shutdownServer`, `rebootServer` and `sleepServer` GraphQL mutations.
+    """Expose `serverPower: ServerPowerMutations { shutdown, reboot, sleep }`.
 
-    The upstream API has `updateServerIdentity` on the `Server` resolver but no
-    way to actually shut the box down, reboot it, or put it to sleep. This
-    injects three Boolean-returning mutations next to it, plus the matching
-    methods on `ServerService` that shell out to `/usr/local/sbin/powerdown`
-    and `rc.s3sleep`.
+    Matches the namespaced shape used by `parityCheck` / `array` / etc. on
+    the upstream Mutation root. Earlier revisions of this companion shipped
+    a flat `shutdownServer`/`rebootServer`/`sleepServer` set of root
+    mutations — this revision REPLACES them with the namespace shape, so it
+    also reverts the flat additions if they're present in the bundle.
 
     Tracked upstream: PR pending on the unraid-api fork.
     """
@@ -897,14 +897,14 @@ def patch_power_mutations_bundle() -> bool:
     if POWER_MUTATIONS_MARKER in content:
         return False
 
-    # Suffixes for the two classes — each lives in its own bundle scope,
-    # so the helper functions (_ts_decorate$X, _ts_metadata$Y) differ.
+    # Suffixes for both injection scopes — the ServerService class lives in
+    # a different bundle scope than ServerResolver (different _ts_decorate$X
+    # function suffixes), so resolve each independently.
     service_anchor = "}\nServerService = _ts_decorate$"
     service_idx = content.find(service_anchor)
     if service_idx == -1:
         log("power-mutations patch: ServerService closer not found")
         return False
-    # Extract just the suffix letters from "_ts_decorate$XXX("
     end = content.find("(", service_idx + len(service_anchor))
     service_suffix = content[service_idx + len(service_anchor) : end]
 
@@ -918,7 +918,32 @@ def patch_power_mutations_bundle() -> bool:
         )
         return False
 
-    # ── 1. New ServerService methods (just before the class closing brace) ──
+    # ── PHASE A: revert the flat v1 additions if they're still in the bundle ──
+    v1_method_block = (
+        "    async shutdownServer() {\n"
+        "        return this.serverService.shutdownServer();\n"
+        "    }\n"
+        "    async rebootServer() {\n"
+        "        return this.serverService.rebootServer();\n"
+        "    }\n"
+        "    async sleepServer() {\n"
+        "        return this.serverService.sleepServer();\n"
+        "    }\n"
+        "    "
+    )
+    if v1_method_block in content:
+        content = content.replace(v1_method_block, "", 1)
+
+    v1_decorator_pattern = re.compile(
+        r'(\], ServerResolver\.prototype, "updateServerIdentity", null\);\n)'
+        r'(?:_ts_decorate\$\w+\(\[\s*\n\s*Mutation\(\(\)=>Boolean,.*?'
+        r'\], ServerResolver\.prototype, "(?:shutdownServer|rebootServer|sleepServer)", null\);\n){3}',
+        re.DOTALL,
+    )
+    if v1_decorator_pattern.search(content):
+        content = v1_decorator_pattern.sub(r"\1", content, count=1)
+
+    # ── PHASE B: ServerService methods (idempotent — only inject if missing) ──
     service_methods = (
         "    fireAndForget(command, args) {\n"
         "        const subprocess = execa(command, args, { detached: true, stdio: 'ignore' });\n"
@@ -949,18 +974,100 @@ def patch_power_mutations_bundle() -> bool:
     if service_closer not in content:
         log("power-mutations patch: service closer anchor not found")
         return False
-    content = content.replace(service_closer, service_methods + service_closer, 1)
+    if "this.fireAndForget('/usr/local/sbin/powerdown', [])" not in content:
+        content = content.replace(service_closer, service_methods + service_closer, 1)
 
-    # ── 2. New ServerResolver method bodies (just before updateServerIdentity) ──
-    resolver_methods = (
-        "    async shutdownServer() {\n"
+    # ── PHASE C: ServerPowerMutations ObjectType class ──
+    sp_class_block = (
+        "class ServerPowerMutations {\n"
+        "}\n"
+        f"ServerPowerMutations = _ts_decorate${resolver_suffix}([\n"
+        f"    ObjectType({{\n"
+        f"        description: 'Server power-state mutations: shut down, reboot, and S3 sleep.'\n"
+        f"    }})\n"
+        f"], ServerPowerMutations);\n"
+    )
+    sr_class_anchor = "class ServerResolver {\n"
+    if sr_class_anchor not in content:
+        log("power-mutations patch: ServerResolver class anchor not found")
+        return False
+    content = content.replace(sr_class_anchor, sp_class_block + sr_class_anchor, 1)
+
+    # ── PHASE D: ServerPowerMutationsResolver class + 3 ResolveField decorators ──
+    sp_resolver_class = (
+        "class ServerPowerMutationsResolver {\n"
+        "    serverService;\n"
+        "    constructor(serverService) {\n"
+        "        this.serverService = serverService;\n"
+        "    }\n"
+        "    async shutdown() {\n"
         "        return this.serverService.shutdownServer();\n"
         "    }\n"
-        "    async rebootServer() {\n"
+        "    async reboot() {\n"
         "        return this.serverService.rebootServer();\n"
         "    }\n"
-        "    async sleepServer() {\n"
+        "    async sleep() {\n"
         "        return this.serverService.sleepServer();\n"
+        "    }\n"
+        "}\n"
+    )
+
+    def field_decorator(method: str, description: str) -> str:
+        return (
+            f"_ts_decorate${resolver_suffix}([\n"
+            f"    UsePermissions({{\n"
+            f"        action: AuthAction.UPDATE_ANY,\n"
+            f"        resource: Resource.SERVERS\n"
+            f"    }}),\n"
+            f"    ResolveField(()=>Boolean, {{\n"
+            f"        description: '{description}'\n"
+            f"    }}),\n"
+            f'    _ts_metadata${meta_suffix}("design:type", Function),\n'
+            f'    _ts_metadata${meta_suffix}("design:paramtypes", []),\n'
+            f'    _ts_metadata${meta_suffix}("design:returntype", Promise)\n'
+            f'], ServerPowerMutationsResolver.prototype, "{method}", null);\n'
+        )
+
+    sp_resolver_decorators = (
+        field_decorator("shutdown", "Cleanly stop the array and power the server off.")
+        + field_decorator("reboot", "Cleanly stop the array and reboot the server.")
+        + field_decorator(
+            "sleep",
+            "Put the server into S3 sleep. Requires the Dynamix S3 Sleep plugin.",
+        )
+    )
+
+    sp_class_decoration = (
+        f"ServerPowerMutationsResolver = _ts_decorate${resolver_suffix}([\n"
+        f"    Injectable(),\n"
+        f"    Resolver(()=>ServerPowerMutations),\n"
+        f'    _ts_metadata${meta_suffix}("design:type", Function),\n'
+        f'    _ts_metadata${meta_suffix}("design:paramtypes", [\n'
+        f'        typeof ServerService === "undefined" ? Object : ServerService\n'
+        f"    ])\n"
+        f"], ServerPowerMutationsResolver);\n"
+    )
+
+    sr_class_decoration_pattern = re.compile(
+        r"ServerResolver = _ts_decorate\$\w+\(\[(?:[^\[\]]|\[[^\[\]]*\])+\], ServerResolver\);"
+    )
+    m_end = sr_class_decoration_pattern.search(content)
+    if not m_end:
+        log("power-mutations patch: ServerResolver class decoration end not found")
+        return False
+    content = (
+        content[: m_end.end()]
+        + "\n"
+        + sp_resolver_class
+        + sp_resolver_decorators
+        + sp_class_decoration
+        + content[m_end.end() :]
+    )
+
+    # ── PHASE E: serverPower() entrypoint method + @Mutation decorator on ServerResolver ──
+    sr_serverpower_method = (
+        "    async serverPower() {\n"
+        "        return new ServerPowerMutations();\n"
         "    }\n"
         "    "
     )
@@ -968,42 +1075,46 @@ def patch_power_mutations_bundle() -> bool:
     if method_anchor not in content:
         log("power-mutations patch: resolver method anchor not found")
         return False
-    content = content.replace(method_anchor, resolver_methods + method_anchor, 1)
+    content = content.replace(method_anchor, sr_serverpower_method + method_anchor, 1)
 
-    # ── 3. Resolver decorators registering the new methods with NestJS ──
-    def make_decorator(method: str, description: str) -> str:
-        return (
-            f"_ts_decorate${resolver_suffix}([\n"
-            f"    Mutation(()=>Boolean, {{\n"
-            f"        description: '{description}'\n"
-            f"    }}),\n"
-            f"    UsePermissions({{\n"
-            f"        action: AuthAction.UPDATE_ANY,\n"
-            f"        resource: Resource.SERVERS\n"
-            f"    }}),\n"
-            f'    _ts_metadata${meta_suffix}("design:type", Function),\n'
-            f'    _ts_metadata${meta_suffix}("design:paramtypes", []),\n'
-            f'    _ts_metadata${meta_suffix}("design:returntype", Promise)\n'
-            f'], ServerResolver.prototype, "{method}", null);\n'
-        )
-
-    new_decorators = (
-        make_decorator("shutdownServer", "Cleanly stop the array and power the server off.")
-        + make_decorator("rebootServer", "Cleanly stop the array and reboot the server.")
-        + make_decorator(
-            "sleepServer",
-            "Put the server into S3 sleep. Requires the Dynamix S3 Sleep plugin.",
-        )
+    serverpower_decorator = (
+        f"_ts_decorate${resolver_suffix}([\n"
+        f"    Mutation(()=>ServerPowerMutations, {{\n"
+        f"        description: 'Server power-state mutations: shutdown, reboot, sleep.'\n"
+        f"    }}),\n"
+        f'    _ts_metadata${meta_suffix}("design:type", Function),\n'
+        f'    _ts_metadata${meta_suffix}("design:paramtypes", []),\n'
+        f'    _ts_metadata${meta_suffix}("design:returntype", Promise)\n'
+        f'], ServerResolver.prototype, "serverPower", null);\n'
+    )
+    si_decorator_anchor = '], ServerResolver.prototype, "updateServerIdentity", null);'
+    content = content.replace(
+        si_decorator_anchor,
+        si_decorator_anchor + "\n" + serverpower_decorator,
+        1,
     )
 
-    if resolver_anchor not in content:
-        log("power-mutations patch: resolver decorator anchor not found")
+    # ── PHASE F: register ServerPowerMutationsResolver in ResolversModule providers ──
+    providers_anchor = (
+        "RootMutationsResolver,\n"
+        "            ServerResolver,\n"
+        "            ServerService,"
+    )
+    if providers_anchor not in content:
+        log("power-mutations patch: ResolversModule providers anchor not found")
         return False
-    content = content.replace(resolver_anchor, resolver_anchor + "\n" + new_decorators, 1)
+    content = content.replace(
+        providers_anchor,
+        "RootMutationsResolver,\n"
+        "            ServerPowerMutationsResolver,\n"
+        "            ServerResolver,\n"
+        "            ServerService,",
+        1,
+    )
 
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched power mutations in {os.path.basename(bundle)}")
+    log(f"patched power mutations (namespace) in {os.path.basename(bundle)}")
     return True
 
 
