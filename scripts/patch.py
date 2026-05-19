@@ -805,6 +805,70 @@ def patch_docker_logs_bundle() -> bool:
     return True
 
 
+DOCKER_REFRESH_OLD = (
+    "        } catch (error) {\n"
+    "            this.logger.error(`Failed to update container ${containerName}:`, error);\n"
+    "            throw new Error(`Failed to update container ${containerName}`);\n"
+    "        }\n"
+    "        const updatedContainers = await this.getContainers();"
+)
+DOCKER_REFRESH_NEW = (
+    "        } catch (error) {\n"
+    "            this.logger.error(`Failed to update container ${containerName}:`, error);\n"
+    "            throw new Error(`Failed to update container ${containerName}`);\n"
+    "        }\n"
+    "        /* u-manager-companion: refresh-digests-post-update */\n"
+    "        try {\n"
+    "            await this.dockerManifestService.refreshDigests();\n"
+    "        } catch (error) {\n"
+    "            this.logger.warn(`Failed to refresh digests after updating ${containerName}: ${error instanceof Error ? error.message : String(error)}`);\n"
+    "        }\n"
+    "        const updatedContainers = await this.getContainers();"
+)
+
+
+def patch_docker_refresh_bundle() -> bool:
+    """Refresh the docker update-status cache after `updateContainer` returns.
+
+    The official `update_container` script writes the cache inline via
+    `setUpdateStatus()` when Docker emits a top-level "Digest:" event during
+    the pull stream. That event isn't guaranteed for every pull — when the
+    registry returns the digest under a per-layer `id` instead of a clean
+    top-level summary line, the cache keeps the pre-update `local` digest.
+
+    The result is a freshly-updated container that the app's
+    `containerUpdateStatuses` query keeps reporting as UPDATE_AVAILABLE
+    until the user manually clicks "Check for updates" in the web UI
+    (which calls `DockerTemplates->getAllInfo(true)` → `reloadUpdateStatus`).
+
+    This patch makes `DockerService.updateContainer` call
+    `dockerManifestService.refreshDigests()` after the script finishes, so
+    the cache is repopulated with fresh local/remote digests in the same
+    flow that already happens on "Check for updates". Wrapped in
+    try/catch so a refresh failure (offline registry, slow remote) never
+    breaks the mutation itself.
+
+    Tracked upstream: PR pending on the unraid-api fork
+    (`fix/docker-update-refresh-digests`).
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("docker-refresh patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if "/* u-manager-companion: refresh-digests-post-update */" in content:
+        return False
+    if DOCKER_REFRESH_OLD not in content:
+        log("docker-refresh patch: updateContainer shape not found")
+        return False
+    content = content.replace(DOCKER_REFRESH_OLD, DOCKER_REFRESH_NEW, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched docker-refresh post-update in {os.path.basename(bundle)}")
+    return True
+
+
 PARITY_RESUME_OLD = (
     "const states = {\n"
     "            pause: {\n"
@@ -1134,6 +1198,7 @@ def main() -> int:
     changed_bundle = patch_bundle()
     changed_docker_stats = patch_docker_stats_bundle()
     changed_docker_logs = patch_docker_logs_bundle()
+    changed_docker_refresh = patch_docker_refresh_bundle()
     changed_parity_resume = patch_parity_resume_bundle()
     changed_power = patch_power_mutations_bundle()
     if any([
@@ -1141,6 +1206,7 @@ def main() -> int:
         changed_bundle,
         changed_docker_stats,
         changed_docker_logs,
+        changed_docker_refresh,
         changed_parity_resume,
         changed_power,
     ]):

@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.19.1">
+<!ENTITY version "2026.05.20.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,12 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.20.1
+- Fix Docker container update badge staying on "Update available" after
+  updating a container via the API. The update-status cache is now
+  refreshed automatically when `updateContainer` finishes, matching the
+  behaviour of the web UI's "Check for updates" button.
+
 ###2026.05.19.1
 - Reshape the server power mutations from three flat root entries
   (`shutdownServer` / `rebootServer` / `sleepServer`) into a single
