@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.20.3">
+<!ENTITY version "2026.05.20.4">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,16 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.20.4
+- Add `installedUnraidPluginsDetailed` GraphQL query exposing parsed
+  `.plg` manifest metadata (name, author, version, pluginURL, support,
+  icon, launch) for every installed plugin. The companion previously
+  relied on the upstream `installedUnraidPlugins` query which only
+  returns bare `.plg` filenames, forcing downstream consumers (the
+  U-Manager app) to cross-reference Community Applications by filename.
+  Private plugins absent from CA (including UManagerCompanion itself)
+  now surface the same rich metadata as community ones.
+
 ###2026.05.20.3
 - Harden `patch.py` regexes to accept `$` inside minified suffixes
   (`_ts_decorate$1$`, `_ts_metadata$2$A`, etc.). Vite/terser

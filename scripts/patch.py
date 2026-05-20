@@ -1347,6 +1347,246 @@ def restart_api() -> None:
         log(f"failed to restart unraid-api: {e}")
 
 
+INSTALLED_PLUGINS_MANIFEST_MARKER = "class InstalledPluginManifest"
+
+
+def patch_installed_plugins_manifest_bundle() -> bool:
+    """Expose `installedUnraidPluginsDetailed: [InstalledPluginManifest!]!`.
+
+    Upstream only ships `installedUnraidPlugins: [String!]!` which returns
+    bare `.plg` filenames. Downstream consumers (this companion's main
+    app, u_manager) then have to cross-reference an external feed
+    (Community Applications) to get a plugin's name, author, version,
+    description, icon, etc. — and any private/non-feed plugin shows up
+    blank.
+
+    This patch moves that parsing server-side by reading each `.plg` XML
+    manifest from `/boot/config/plugins/` and emitting a structured
+    `InstalledPluginManifest` per plugin.
+
+    Tracked upstream: pending PR on the unraid-api fork.
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("installed-plugins-manifest patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if INSTALLED_PLUGINS_MANIFEST_MARKER in content:
+        return False
+
+    # ── Discover decorator suffixes ──
+    # Model file scope (PluginInstallEvent / PluginInstallOperation)
+    model_d = find_decorator_suffix(
+        content, 'PluginInstallEvent.prototype, "timestamp", void 0)'
+    )
+    model_m = find_metadata_suffix(
+        content, 'PluginInstallEvent.prototype, "timestamp", void 0)'
+    )
+    # Resolver file scope (UnraidPluginsResolver)
+    resolver_d = find_decorator_suffix(
+        content, 'UnraidPluginsResolver.prototype, "installedUnraidPlugins", null)'
+    )
+    resolver_m = find_metadata_suffix(
+        content, 'UnraidPluginsResolver.prototype, "installedUnraidPlugins", null)'
+    )
+    # Service file scope (UnraidPluginsService) — different from resolver
+    service_anchor = "}\nUnraidPluginsService = _ts_decorate$"
+    service_idx = content.find(service_anchor)
+    if service_idx == -1:
+        log("installed-plugins-manifest patch: UnraidPluginsService closer not found")
+        return False
+    end = content.find("(", service_idx + len(service_anchor))
+    service_d = content[service_idx + len(service_anchor) : end]
+
+    if not all([model_d, model_m, resolver_d, resolver_m, service_d]):
+        log(
+            f"installed-plugins-manifest patch: missing suffix "
+            f"(model={model_d}/{model_m} resolver={resolver_d}/{resolver_m} "
+            f"service={service_d})"
+        )
+        return False
+
+    # ── PHASE A: InstalledPluginManifest ObjectType in model scope ──
+    model_anchor = "], PluginInstallEvent);"
+    if model_anchor not in content:
+        log("installed-plugins-manifest patch: PluginInstallEvent closer not found")
+        return False
+
+    def field_dec(prop: str, desc: str, nullable: bool) -> str:
+        opts = (
+            "{ nullable: true, description: '" + desc + "' }"
+            if nullable
+            else "{ description: '" + desc + "' }"
+        )
+        return (
+            f"_ts_decorate${model_d}([\n"
+            f"    Field(()=>String, {opts}),\n"
+            f"    _ts_metadata${model_m}(\"design:type\", String)\n"
+            f"], InstalledPluginManifest.prototype, \"{prop}\", void 0);\n"
+        )
+
+    manifest_block = (
+        "\nclass InstalledPluginManifest {\n"
+        "    filename;\n"
+        "    name;\n"
+        "    author;\n"
+        "    version;\n"
+        "    description;\n"
+        "    pluginURL;\n"
+        "    support;\n"
+        "    icon;\n"
+        "    launch;\n"
+        "}\n"
+        + field_dec("filename", "Bare .plg filename in /boot/config/plugins", nullable=False)
+        + field_dec(
+            "name",
+            "Plugin name slug from <!ENTITY name>. Falls back to filename without .plg.",
+            nullable=False,
+        )
+        + field_dec("author", "Plugin author from <!ENTITY author>", nullable=True)
+        + field_dec("version", "Plugin version string from <!ENTITY version>", nullable=True)
+        + field_dec(
+            "description",
+            "Free-text description from <!ENTITY description>",
+            nullable=True,
+        )
+        + field_dec(
+            "pluginURL",
+            "Remote .plg URL from <!ENTITY pluginURL>",
+            nullable=True,
+        )
+        + field_dec("support", "Support thread URL from <!ENTITY support>", nullable=True)
+        + field_dec("icon", "Icon path or URL from <!ENTITY icon>", nullable=True)
+        + field_dec("launch", "Launch path from <!ENTITY launch>", nullable=True)
+        + f"InstalledPluginManifest = _ts_decorate${model_d}([\n"
+        + "    ObjectType({\n"
+        + "        description: 'Parsed manifest of an installed Unraid plugin (.plg file)'\n"
+        + "    })\n"
+        + "], InstalledPluginManifest);\n"
+    )
+    content = content.replace(model_anchor, model_anchor + manifest_block, 1)
+
+    # ── PHASE B: Service methods on UnraidPluginsService class body ──
+    # Uses the bundle-level `path` and `fs` imports already in scope
+    # (verified by the existing listInstalledPlugins() body).
+    service_methods = r"""    async listInstalledPluginsDetailed() {
+        const paths = this.configService.get('store.paths', {});
+        const dynamixBase = paths?.['dynamix-base'] ?? '/boot/config/plugins/dynamix';
+        const pluginsDir = path.resolve(dynamixBase, '..');
+        const filenames = await this.listInstalledPlugins();
+        return Promise.all(filenames.map((f) => this.parsePluginManifest(f, pluginsDir)));
+    }
+    async parsePluginManifest(filename, pluginsDir) {
+        const fullPath = path.join(pluginsDir, filename);
+        let xml = '';
+        try { xml = await fs.readFile(fullPath, 'utf8'); }
+        catch (e) { this.logger.warn(`Failed to read plugin manifest ${fullPath}: ${e}`); }
+        const entities = {};
+        const entityRe = /<!ENTITY\s+(\w+)\s+(?:"([^"]*)"|'([^']*)')/g;
+        let em;
+        while ((em = entityRe.exec(xml)) !== null) {
+            entities[em[1]] = (em[2] ?? em[3] ?? '').trim();
+        }
+        const pluginTag = xml.match(/<PLUGIN\s+([^>]*)>/s);
+        const attrs = {};
+        if (pluginTag) {
+            const attrRe = /(\w+)\s*=\s*"([^"]*)"/g;
+            let am;
+            while ((am = attrRe.exec(pluginTag[1])) !== null) {
+                attrs[am[1]] = am[2];
+            }
+        }
+        const resolve = (value, depth = 0) => {
+            if (value == null) return null;
+            if (depth > 5) return value;
+            const replaced = value.replace(/&(\w+);/g, (_, key) => {
+                const r = entities[key];
+                return r !== undefined ? (resolve(r, depth + 1) ?? `&${key};`) : `&${key};`;
+            });
+            return replaced.trim() || null;
+        };
+        const pick = (key, ...aliases) => {
+            for (const k of [key, ...aliases]) {
+                if (attrs[k] != null) return resolve(attrs[k]);
+            }
+            for (const k of [key, ...aliases]) {
+                if (entities[k] != null) return resolve(entities[k]);
+            }
+            return null;
+        };
+        return {
+            filename,
+            name: pick('name') ?? filename.replace(/\.plg$/, ''),
+            author: pick('author'),
+            version: pick('version'),
+            description: pick('description'),
+            pluginURL: pick('pluginURL'),
+            support: pick('support', 'supportURL'),
+            icon: pick('icon'),
+            launch: pick('launch'),
+        };
+    }
+"""
+    service_closer_full = f"}}\nUnraidPluginsService = _ts_decorate${service_d}("
+    if service_closer_full not in content:
+        log("installed-plugins-manifest patch: service closer anchor mismatch")
+        return False
+    content = content.replace(service_closer_full, service_methods + service_closer_full, 1)
+
+    # ── PHASE C: Resolver method body on UnraidPluginsResolver class ──
+    resolver_closer_anchor = (
+        "    pluginInstallUpdates(operationId) {\n"
+        "        return this.pluginsService.subscribe(operationId);\n"
+        "    }\n"
+        "}"
+    )
+    if resolver_closer_anchor not in content:
+        log("installed-plugins-manifest patch: resolver closer anchor not found")
+        return False
+    resolver_method = (
+        "    pluginInstallUpdates(operationId) {\n"
+        "        return this.pluginsService.subscribe(operationId);\n"
+        "    }\n"
+        "    async installedUnraidPluginsDetailed() {\n"
+        "        return this.pluginsService.listInstalledPluginsDetailed();\n"
+        "    }\n"
+        "}"
+    )
+    content = content.replace(resolver_closer_anchor, resolver_method, 1)
+
+    # ── PHASE D: Query decorator for the new method ──
+    existing_query_anchor = (
+        '], UnraidPluginsResolver.prototype, "installedUnraidPlugins", null);'
+    )
+    if existing_query_anchor not in content:
+        log("installed-plugins-manifest patch: existing Query anchor not found")
+        return False
+    new_query_decoration = (
+        existing_query_anchor + "\n"
+        f"_ts_decorate${resolver_d}([\n"
+        f"    Query(()=>[\n"
+        f"            InstalledPluginManifest\n"
+        f"        ], {{\n"
+        f"        description: 'List installed Unraid OS plugins enriched with parsed .plg manifest metadata.'\n"
+        f"    }}),\n"
+        f"    UsePermissions({{\n"
+        f"        action: AuthAction.READ_ANY,\n"
+        f"        resource: Resource.CONFIG\n"
+        f"    }}),\n"
+        f"    _ts_metadata${resolver_m}(\"design:type\", Function),\n"
+        f"    _ts_metadata${resolver_m}(\"design:paramtypes\", []),\n"
+        f"    _ts_metadata${resolver_m}(\"design:returntype\", Promise)\n"
+        f'], UnraidPluginsResolver.prototype, "installedUnraidPluginsDetailed", null);'
+    )
+    content = content.replace(existing_query_anchor, new_query_decoration, 1)
+
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched installed-plugins-manifest in {os.path.basename(bundle)}")
+    return True
+
+
 def main() -> int:
     changed_pubsub = patch_pubsub()
     changed_bundle = patch_bundle()
@@ -1355,6 +1595,7 @@ def main() -> int:
     changed_docker_refresh = patch_docker_refresh_bundle()
     changed_parity_resume = patch_parity_resume_bundle()
     changed_power = patch_power_mutations_bundle()
+    changed_installed_manifest = patch_installed_plugins_manifest_bundle()
     if any([
         changed_pubsub,
         changed_bundle,
@@ -1363,6 +1604,7 @@ def main() -> int:
         changed_docker_refresh,
         changed_parity_resume,
         changed_power,
+        changed_installed_manifest,
     ]):
         restart_api()
         log("patches applied — unraid-api will restart")
