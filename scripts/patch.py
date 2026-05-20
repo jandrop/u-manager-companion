@@ -1515,17 +1515,31 @@ def patch_installed_plugins_manifest_bundle() -> bool:
             }
             return null;
         };
+        const resolvedName = pick('name') ?? filename.replace(/\.plg$/, '');
+        const description = await this.readPluginReadmeDescription(resolvedName);
         return {
             filename,
-            name: pick('name') ?? filename.replace(/\.plg$/, ''),
+            name: resolvedName,
             author: pick('author'),
             version: pick('version'),
-            description: pick('description'),
+            description,
             pluginURL: pick('pluginURL'),
             support: pick('support', 'supportURL'),
             icon: pick('icon'),
             launch: pick('launch'),
         };
+    }
+    async readPluginReadmeDescription(name) {
+        const readmePath = `/usr/local/emhttp/plugins/${name}/README.md`;
+        let body;
+        try { body = await fs.readFile(readmePath, 'utf8'); }
+        catch { return null; }
+        const lines = body.split('\n');
+        if (lines[0]?.trim().startsWith('**') && lines[0]?.trim().endsWith('**')) {
+            lines.shift();
+        }
+        const cleaned = lines.join('\n').trim();
+        return cleaned.length > 0 ? cleaned : null;
     }
 """
     service_closer_full = f"}}\nUnraidPluginsService = _ts_decorate${service_d}("
