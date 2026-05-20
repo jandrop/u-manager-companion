@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.20.7">
+<!ENTITY version "2026.05.20.8">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -12,6 +12,15 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&icon;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.20.8
+- Add `unraidPlugins.uninstallPlugin(filename)` GraphQL mutation.
+  Wires `plugin remove FILENAME` (the same script the existing
+  install mutation already invokes) onto the existing operation
+  pipeline, so progress for an uninstall streams through
+  `pluginInstallUpdates` exactly like an install. Lets downstream
+  consumers (the U-Manager app) remove plugins without bouncing
+  the user through the Unraid web UI.
+
 ###2026.05.20.6
 - `installedUnraidPluginsDetailed` now also exposes the plugin
   changelog (raw `<CHANGES>` block) and the cached update info
