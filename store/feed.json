@@ -16,7 +16,13 @@
       "MinVer": "6.11.0",
       "CategoryList": ["Tools-Utilities", "Network-Other"],
       "Date": "2026-05-07",
-      "License": "MIT"
+      "License": "MIT",
+      "RecommendedBy": "U-Manager",
+      "RecommendedDate": 1747785600,
+      "RecommendedReason": {
+        "en": "Install this on your Unraid server to forward Dynamix notifications to the U-Manager mobile app.",
+        "es": "Instala este plugin en el servidor para que U-Manager reciba las notificaciones push de Dynamix."
+      }
     },
     {
       "Plugin": true,
@@ -33,7 +39,13 @@
       "MinVer": "6.11.0",
       "CategoryList": ["Tools-Utilities", "Productivity"],
       "Date": "2026-05-20",
-      "License": "MIT"
+      "License": "MIT",
+      "RecommendedBy": "U-Manager",
+      "RecommendedDate": 1747785600,
+      "RecommendedReason": {
+        "en": "Required on the Unraid server for U-Manager to access plugin manifests, network metrics and Docker stats over GraphQL.",
+        "es": "Requerido en el servidor para que U-Manager acceda a los manifests de plugins, métricas de red y stats de Docker vía GraphQL."
+      }
     }
   ]
 }
