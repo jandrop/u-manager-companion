@@ -1,0 +1,39 @@
+{
+  "_comment": "Side feed for my own plugins. Same shape as upstream applicationFeed.json — U-Manager concatenates this onto the CA feed at fetch time.",
+  "applist": [
+    {
+      "Plugin": true,
+      "Name": "UManager",
+      "PluginURL": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/UManager.plg",
+      "PluginAuthor": "jandrop",
+      "Author": "jandrop",
+      "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/plugins/dynamix/icons/umanager.png",
+      "Overview": "Push notification agent for the U-Manager mobile app. Forwards Unraid Dynamix notifications (parity check, UPS events, Docker updates, etc.) over HTTPS to a Cloudflare Worker, which relays them to FCM and onto your device. Pair the Unraid server with the mobile app via the in-app QR scanner.",
+      "Support": "https://github.com/jandrop/u-manager-unraid-plugin/issues",
+      "Project": "https://github.com/jandrop/u-manager-unraid-plugin",
+      "Repo": "U-Manager",
+      "RepoShort": "u-manager",
+      "MinVer": "6.11.0",
+      "CategoryList": ["Tools-Utilities", "Network-Other"],
+      "Date": "2026-05-07",
+      "License": "MIT"
+    },
+    {
+      "Plugin": true,
+      "Name": "U-Manager Companion",
+      "PluginURL": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/UManagerCompanion.plg",
+      "PluginAuthor": "jandrop",
+      "Author": "jandrop",
+      "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/assets/icon.png",
+      "Overview": "Monkey-patches Unraid's bundled GraphQL API at boot to expose extra data the U-Manager mobile app needs — installed-plugin manifest metadata, network device utilisation, Docker stats, parity-check resume, power mutations and more. Required on the Unraid server for the app to show the full picture.",
+      "Support": "https://github.com/jandrop/u-manager-companion/issues",
+      "Project": "https://github.com/jandrop/u-manager-companion",
+      "Repo": "U-Manager Companion",
+      "RepoShort": "u-manager-companion",
+      "MinVer": "6.11.0",
+      "CategoryList": ["Tools-Utilities", "Productivity"],
+      "Date": "2026-05-20",
+      "License": "MIT"
+    }
+  ]
+}
