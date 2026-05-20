@@ -8,7 +8,7 @@
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
       "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/plugins/dynamix/icons/umanager.png",
-      "Overview": "Push notification agent for the U-Manager mobile app. Forwards Unraid Dynamix notifications (parity check, UPS events, Docker updates, etc.) over HTTPS to a Cloudflare Worker, which relays them to FCM and onto your device. Pair the Unraid server with the mobile app via the in-app QR scanner.",
+      "Overview": "Push notification agent for the U-Manager mobile app. Forwards Unraid notifications to your phone so you don't have to keep the web UI open.",
       "Support": "https://github.com/jandrop/u-manager-unraid-plugin/issues",
       "Project": "https://github.com/jandrop/u-manager-unraid-plugin",
       "Repo": "U-Manager",
