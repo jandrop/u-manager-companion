@@ -47,12 +47,17 @@ def log(msg: str) -> None:
 
 
 def find_decorator_suffix(content: str, anchor: str) -> Optional[str]:
-    """Find the `_ts_decorate$XXX` suffix used near a known anchor."""
+    """Find the `_ts_decorate$XXX` suffix used near a known anchor.
+
+    Vite/terser sometimes mints identifiers containing `$` (e.g. `1$`,
+    `2$A`), so the suffix charclass needs to accept `$` in addition to
+    the usual `\\w` characters.
+    """
     idx = content.find(anchor)
     if idx == -1:
         return None
     chunk = content[max(0, idx - 800) : idx]
-    matches = re.findall(r"_ts_decorate\$(\w+)\(\[", chunk)
+    matches = re.findall(r"_ts_decorate\$([\w$]+)\(\[", chunk)
     return matches[-1] if matches else None
 
 
@@ -61,7 +66,7 @@ def find_metadata_suffix(content: str, anchor: str) -> Optional[str]:
     if idx == -1:
         return None
     chunk = content[max(0, idx - 800) : idx]
-    matches = re.findall(r"_ts_metadata\$(\w+)\(", chunk)
+    matches = re.findall(r"_ts_metadata\$([\w$]+)\(", chunk)
     return matches[-1] if matches else None
 
 
@@ -642,7 +647,7 @@ def patch_docker_stats_bundle() -> bool:
         return False
 
     anchor_re = re.compile(
-        r"DockerStatsService = _ts_decorate\$\w+\(\[\s*Injectable\(\)\s*\],\s*DockerStatsService\);"
+        r"DockerStatsService = _ts_decorate\$[\w$]+\(\[\s*Injectable\(\)\s*\],\s*DockerStatsService\);"
     )
     match = anchor_re.search(content)
     if not match:
@@ -1000,7 +1005,7 @@ def patch_power_mutations_bundle() -> bool:
 
     v1_decorator_pattern = re.compile(
         r'(\], ServerResolver\.prototype, "updateServerIdentity", null\);\n)'
-        r'(?:_ts_decorate\$\w+\(\[\s*\n\s*Mutation\(\(\)=>Boolean,.*?'
+        r'(?:_ts_decorate\$[\w$]+\(\[\s*\n\s*Mutation\(\(\)=>Boolean,.*?'
         r'\], ServerResolver\.prototype, "(?:shutdownServer|rebootServer|sleepServer)", null\);\n){3}',
         re.DOTALL,
     )
@@ -1140,7 +1145,7 @@ def patch_power_mutations_bundle() -> bool:
     )
 
     sr_class_decoration_pattern = re.compile(
-        r"ServerResolver = _ts_decorate\$\w+\(\[(?:[^\[\]]|\[[^\[\]]*\])+\], ServerResolver\);"
+        r"ServerResolver = _ts_decorate\$[\w$]+\(\[(?:[^\[\]]|\[[^\[\]]*\])+\], ServerResolver\);"
     )
     m_end = sr_class_decoration_pattern.search(content)
     if not m_end:
@@ -1183,7 +1188,7 @@ def patch_power_mutations_bundle() -> bool:
     # The legacy decorator block came in two shapes (with and without
     # `UsePermissions`). Match either with a regex.
     legacy_decorator_re = re.compile(
-        r"\n?_ts_decorate\$\w+\(\[\n"
+        r"\n?_ts_decorate\$[\w$]+\(\[\n"
         r"    Mutation\(\(\)=>ServerPowerMutations, \{\n"
         r"        description: 'Server power-state mutations: shutdown, reboot, sleep\.'\n"
         r"    \}\),\n"
@@ -1191,9 +1196,9 @@ def patch_power_mutations_bundle() -> bool:
         r"        action: AuthAction\.UPDATE_ANY,\n"
         r"        resource: Resource\.SERVERS\n"
         r"    \}\),\n)?"
-        r"    _ts_metadata\$\w+\(\"design:type\", Function\),\n"
-        r"    _ts_metadata\$\w+\(\"design:paramtypes\", \[\]\),\n"
-        r"    _ts_metadata\$\w+\(\"design:returntype\", Promise\)\n"
+        r"    _ts_metadata\$[\w$]+\(\"design:type\", Function\),\n"
+        r"    _ts_metadata\$[\w$]+\(\"design:paramtypes\", \[\]\),\n"
+        r"    _ts_metadata\$[\w$]+\(\"design:returntype\", Promise\)\n"
         r"\], ServerResolver\.prototype, \"serverPower\", null\);\n"
     )
     content = legacy_decorator_re.sub("", content, count=1)
@@ -1278,13 +1283,13 @@ def patch_power_mutations_bundle() -> bool:
         # Detect the suffix used by the existing `unraidPlugins` decorator
         # in this scope (different chunk from RootMutations' Field decorator).
         unraid_dec_re = re.compile(
-            r"_ts_decorate\$(\w+)\(\[\n"
+            r"_ts_decorate\$([\w$]+)\(\[\n"
             r"    Mutation\(\(\)=>UnraidPluginsMutations, \{\n"
             r"        name: 'unraidPlugins'\n"
             r"    \}\),\n"
-            r"    _ts_metadata\$(\w+)\(\"design:type\", Function\),\n"
-            r"    _ts_metadata\$\w+\(\"design:paramtypes\", \[\]\),\n"
-            r"    _ts_metadata\$\w+\(\"design:returntype\", typeof UnraidPluginsMutations === \"undefined\" \? Object : UnraidPluginsMutations\)\n"
+            r"    _ts_metadata\$([\w$]+)\(\"design:type\", Function\),\n"
+            r"    _ts_metadata\$[\w$]+\(\"design:paramtypes\", \[\]\),\n"
+            r"    _ts_metadata\$[\w$]+\(\"design:returntype\", typeof UnraidPluginsMutations === \"undefined\" \? Object : UnraidPluginsMutations\)\n"
             r"\], RootMutationsResolver\.prototype, \"unraidPlugins\", null\);\n"
         )
         m_dec = unraid_dec_re.search(content)
