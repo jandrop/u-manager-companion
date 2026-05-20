@@ -1426,6 +1426,16 @@ def patch_installed_plugins_manifest_bundle() -> bool:
             f"], InstalledPluginManifest.prototype, \"{prop}\", void 0);\n"
         )
 
+    # The lastCheckedAt field uses GraphQLISODateTime + Date type (rather
+    # than the plain `String` of the other fields) so the API returns a
+    # proper ISO 8601 timestamp the client can parse into a DateTime.
+    last_checked_dec = (
+        f"_ts_decorate${model_d}([\n"
+        f"    Field(()=>GraphQLISODateTime, {{ nullable: true, description: 'Timestamp of the cached remote .plg at /tmp/plugins/<filename>.plg — when Unraid last fetched it via plugin checkall.' }}),\n"
+        f'    _ts_metadata${model_m}("design:type", typeof Date === "undefined" ? Object : Date)\n'
+        f'], InstalledPluginManifest.prototype, "lastCheckedAt", void 0);\n'
+    )
+
     manifest_block = (
         "\nclass InstalledPluginManifest {\n"
         "    filename;\n"
@@ -1437,6 +1447,9 @@ def patch_installed_plugins_manifest_bundle() -> bool:
         "    support;\n"
         "    icon;\n"
         "    launch;\n"
+        "    changelog;\n"
+        "    latestVersion;\n"
+        "    lastCheckedAt;\n"
         "}\n"
         + field_dec("filename", "Bare .plg filename in /boot/config/plugins", nullable=False)
         + field_dec(
@@ -1459,6 +1472,17 @@ def patch_installed_plugins_manifest_bundle() -> bool:
         + field_dec("support", "Support thread URL from <!ENTITY support>", nullable=True)
         + field_dec("icon", "Icon path or URL from <!ENTITY icon>", nullable=True)
         + field_dec("launch", "Launch path from <!ENTITY launch>", nullable=True)
+        + field_dec(
+            "changelog",
+            "Raw <CHANGES> body from the local .plg",
+            nullable=True,
+        )
+        + field_dec(
+            "latestVersion",
+            "Version from /tmp/plugins/<filename>.plg if Unraid cached it",
+            nullable=True,
+        )
+        + last_checked_dec
         + f"InstalledPluginManifest = _ts_decorate${model_d}([\n"
         + "    ObjectType({\n"
         + "        description: 'Parsed manifest of an installed Unraid plugin (.plg file)'\n"
@@ -1517,6 +1541,10 @@ def patch_installed_plugins_manifest_bundle() -> bool:
         };
         const resolvedName = pick('name') ?? filename.replace(/\.plg$/, '');
         const description = await this.readPluginReadmeDescription(resolvedName);
+        const changesMatch = xml.match(/<CHANGES>([\s\S]*?)<\/CHANGES>/);
+        const changelogBody = changesMatch ? changesMatch[1].trim() : null;
+        const changelog = changelogBody && changelogBody.length > 0 ? changelogBody : null;
+        const updateInfo = await this.readCachedPluginUpdate(filename);
         return {
             filename,
             name: resolvedName,
@@ -1527,6 +1555,9 @@ def patch_installed_plugins_manifest_bundle() -> bool:
             support: pick('support', 'supportURL'),
             icon: pick('icon'),
             launch: pick('launch'),
+            changelog,
+            latestVersion: updateInfo.latestVersion,
+            lastCheckedAt: updateInfo.lastCheckedAt,
         };
     }
     async readPluginReadmeDescription(name) {
@@ -1540,6 +1571,19 @@ def patch_installed_plugins_manifest_bundle() -> bool:
         }
         const cleaned = lines.join('\n').trim();
         return cleaned.length > 0 ? cleaned : null;
+    }
+    async readCachedPluginUpdate(filename) {
+        const cachePath = `/tmp/plugins/${filename}`;
+        let stat;
+        try { stat = await fs.stat(cachePath); }
+        catch { return { latestVersion: null, lastCheckedAt: null }; }
+        let xml = '';
+        try { xml = await fs.readFile(cachePath, 'utf8'); }
+        catch { return { latestVersion: null, lastCheckedAt: stat.mtime }; }
+        const versionMatch = xml.match(/<!ENTITY\s+version\s+(?:"([^"]*)"|'([^']*)')/s);
+        const raw = versionMatch ? (versionMatch[1] ?? versionMatch[2] ?? '') : '';
+        const latestVersion = raw.trim().length > 0 ? raw.trim() : null;
+        return { latestVersion, lastCheckedAt: stat.mtime };
     }
 """
     service_closer_full = f"}}\nUnraidPluginsService = _ts_decorate${service_d}("
