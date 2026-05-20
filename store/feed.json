@@ -20,8 +20,8 @@
       "RecommendedWho": "U-Manager",
       "RecommendedDate": 1747785600,
       "RecommendedReason": {
-        "en_US": "Install this on your Unraid server to forward Dynamix notifications to the U-Manager mobile app.",
-        "es_ES": "Instala este plugin en el servidor para que U-Manager reciba las notificaciones push de Dynamix."
+        "en_US": "Install this on your Unraid server to forward notifications to the U-Manager mobile app.",
+        "es_ES": "Instala este plugin en el servidor para que U-Manager reciba las notificaciones."
       }
     },
     {
