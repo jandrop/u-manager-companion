@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.20.1">
+<!ENTITY version "2026.05.20.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -11,6 +11,19 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.20.2
+- Fix `Mutation.serverPower` returning null silently. The earlier
+  patch wired the namespace as `@Mutation()` on `ServerResolver`
+  but NestJS needs the field on `RootMutationsResolver` instead,
+  matching how `array`, `docker`, `unraidPlugins` etc. are
+  registered. Also moves the `ServerPowerMutations` class
+  declaration before `RootMutations` so the field decorator can
+  reference it without hitting the temporal dead zone.
+- Swap the underlying commands to match the web UI's
+  Powerdown.php: `/sbin/poweroff` for shutdown, `/sbin/reboot`
+  for reboot. Drops the `/usr/local/sbin/powerdown` wrapper
+  which isn't strictly needed.
+
 ###2026.05.20.1
 - Fix Docker container update badge staying on "Update available" after
   updating a container via the API. The update-status cache is now
