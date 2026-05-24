@@ -1541,7 +1541,7 @@ def patch_installed_plugins_manifest_bundle() -> bool:
         };
         const resolvedName = pick('name') ?? filename.replace(/\.plg$/, '');
         const description = await this.readPluginReadmeDescription(resolvedName);
-        const changesMatch = xml.match(/<CHANGES>([\s\S]*?)<\/CHANGES>/);
+        const changesMatch = xml.match(/<CHANGES>\s*(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?\s*<\/CHANGES>/);
         const changelogBody = changesMatch ? changesMatch[1].trim() : null;
         const changelog = changelogBody && changelogBody.length > 0 ? changelogBody : null;
         const updateInfo = await this.readCachedPluginUpdate(filename);
@@ -1822,6 +1822,51 @@ def patch_uninstall_plugin_bundle() -> bool:
     return True
 
 
+CHANGELOG_CDATA_OLD = (
+    r"        const changesMatch = xml.match(/<CHANGES>([\s\S]*?)<\/CHANGES>/);"
+)
+CHANGELOG_CDATA_NEW = (
+    r"        const changesMatch = xml.match(/<CHANGES>\s*(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?\s*<\/CHANGES>/);"
+)
+
+
+def patch_changelog_cdata_strip_bundle() -> bool:
+    """Strip `<![CDATA[ ... ]]>` markers from the captured `<CHANGES>` body.
+
+    Companion .plg files now wrap their `<CHANGES>` block in CDATA so the
+    XML parses cleanly when changelog entries contain backtick-quoted text
+    like `<filename>` or `<CHANGES>` (otherwise `plugin check` fails and
+    /tmp/plugins/<name>.plg never refreshes). The existing
+    parsePluginManifest regex captures the inside of `<CHANGES>` greedy
+    of any wrapper, so the CDATA markers themselves now appear at the
+    top of the Release Notes view in the U-Manager app.
+
+    This patch tweaks the regex to make the CDATA markers optional
+    capture group separators so they get stripped before the body is
+    returned. Already-CDATA-free plugins keep working unchanged.
+
+    Idempotent: looks for the original one-line regex and replaces it
+    with the CDATA-tolerant version. Re-runs are no-ops once the new
+    regex is in place.
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("changelog-cdata patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if CHANGELOG_CDATA_NEW in content:
+        return False
+    if CHANGELOG_CDATA_OLD not in content:
+        log("changelog-cdata patch: original regex line not found")
+        return False
+    content = content.replace(CHANGELOG_CDATA_OLD, CHANGELOG_CDATA_NEW, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched changelog CDATA stripping in {os.path.basename(bundle)}")
+    return True
+
+
 INDEX_BUNDLE_GLOB = "/usr/local/unraid-api/dist/assets/index-*.js"
 
 ARRAY_SUBSCRIPTION_OLD = (
@@ -1894,6 +1939,7 @@ def main() -> int:
     changed_installed_manifest = patch_installed_plugins_manifest_bundle()
     changed_uninstall = patch_uninstall_plugin_bundle()
     changed_array_subscription = patch_array_subscription_bundle()
+    changed_changelog_cdata = patch_changelog_cdata_strip_bundle()
     if any([
         changed_pubsub,
         changed_bundle,
@@ -1905,6 +1951,7 @@ def main() -> int:
         changed_installed_manifest,
         changed_uninstall,
         changed_array_subscription,
+        changed_changelog_cdata,
     ]):
         restart_api()
         log("patches applied — unraid-api will restart")

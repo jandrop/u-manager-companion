@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.24.1">
+<!ENTITY version "2026.05.24.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -13,6 +13,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.24.2
+- Clean up the Release Notes view in the U-Manager app — internal XML
+  wrapper text (`<![CDATA[`) no longer appears at the top of the
+  changelog the app shows for installed plugins.
+
 ###2026.05.24.1
 - Fix a bug in the official Unraid API that broke the live updates
   the U-Manager app uses for the Array view. Unraid hasn't shipped
