@@ -12,6 +12,7 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&icon;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+<![CDATA[
 ###2026.05.24.1
 - Fix a bug in the official Unraid API that broke the live updates
   the U-Manager app uses for the Array view. Unraid hasn't shipped
@@ -163,6 +164,7 @@
 - Patches the Unraid GraphQL API at boot to expose network device data
   (info.devices.network) and add the systemMetricsNetwork subscription.
 - See upstream tracking issue: https://github.com/unraid/api/issues/1818
+]]>
 </CHANGES>
 
 <!-- Plugin icon shown in the Unraid Plugins page. Unraid looks for
