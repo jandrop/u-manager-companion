@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.20.8">
+<!ENTITY version "2026.05.24.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -12,6 +12,13 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&icon;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
+###2026.05.24.1
+- Fix a bug in the official Unraid API that broke the live updates
+  the U-Manager app uses for the Array view. Unraid hasn't shipped
+  the fix upstream yet, so the companion patches it locally —
+  changes to disks, parity and pools now reach the app instantly
+  instead of waiting for the next poll.
+
 ###2026.05.20.8
 - Add `unraidPlugins.uninstallPlugin(filename)` GraphQL mutation.
   Wires `plugin remove FILENAME` (the same script the existing

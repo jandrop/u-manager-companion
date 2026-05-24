@@ -1822,6 +1822,67 @@ def patch_uninstall_plugin_bundle() -> bool:
     return True
 
 
+INDEX_BUNDLE_GLOB = "/usr/local/unraid-api/dist/assets/index-*.js"
+
+ARRAY_SUBSCRIPTION_OLD = (
+    "pubsub.publish(GRAPHQL_PUBSUB_CHANNEL.ARRAY, {\n"
+    "                            array\n"
+    "                        });"
+)
+ARRAY_SUBSCRIPTION_NEW = (
+    "pubsub.publish(GRAPHQL_PUBSUB_CHANNEL.ARRAY, {\n"
+    "                            arraySubscription: array\n"
+    "                        });"
+)
+
+
+def patch_array_subscription_bundle() -> bool:
+    """Fix `Subscription.arraySubscription` returning null.
+
+    The listener in `array-event-listener.ts` publishes `{ array }` to
+    `PUBSUB_CHANNEL.ARRAY`, but the subscription resolver field is named
+    `arraySubscription`. NestJS by default reads `payload.arraySubscription`
+    from the publish payload, finds `undefined`, and returns null —
+    which fails the non-nullable return type and triggers the error
+    "Cannot return null for non-nullable field Subscription.arraySubscription"
+    every time a disk state file is reloaded.
+
+    The canonical fix publishes under the matching key:
+        pubsub.publish(..., { arraySubscription: array })
+
+    This patch lives in `index-*.js` (the bundle that contains the store
+    listener), not the main `plugin.module-*.js` patched everywhere else,
+    so it uses its own bundle finder.
+
+    Tracked upstream: PR pending on the unraid-api fork
+    (fix/array-subscription-payload-key).
+    """
+    candidates = glob.glob(INDEX_BUNDLE_GLOB)
+    bundle = next(
+        (
+            p
+            for p in candidates
+            if "pubsub.publish(GRAPHQL_PUBSUB_CHANNEL.ARRAY" in open(p).read()
+        ),
+        None,
+    )
+    if not bundle:
+        log("array-subscription patch: index bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if ARRAY_SUBSCRIPTION_NEW in content:
+        return False
+    if ARRAY_SUBSCRIPTION_OLD not in content:
+        log("array-subscription patch: original publish call shape not found")
+        return False
+    content = content.replace(ARRAY_SUBSCRIPTION_OLD, ARRAY_SUBSCRIPTION_NEW, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched array-subscription payload key in {os.path.basename(bundle)}")
+    return True
+
+
 def main() -> int:
     changed_pubsub = patch_pubsub()
     changed_bundle = patch_bundle()
@@ -1832,6 +1893,7 @@ def main() -> int:
     changed_power = patch_power_mutations_bundle()
     changed_installed_manifest = patch_installed_plugins_manifest_bundle()
     changed_uninstall = patch_uninstall_plugin_bundle()
+    changed_array_subscription = patch_array_subscription_bundle()
     if any([
         changed_pubsub,
         changed_bundle,
@@ -1842,6 +1904,7 @@ def main() -> int:
         changed_power,
         changed_installed_manifest,
         changed_uninstall,
+        changed_array_subscription,
     ]):
         restart_api()
         log("patches applied — unraid-api will restart")
