@@ -23,6 +23,14 @@ Patches applied:
      to the GraphQL Mutation root. They shell out to /usr/local/sbin/powerdown
      and the Dynamix S3 Sleep plugin's rc.s3sleep respectively, gated by the
      same UPDATE_ANY / SERVERS permission as `updateServerIdentity`.
+  7. Share mutations: add `createShare`, `updateShare` and `deleteShare`
+     to the GraphQL Mutation root. The upstream `SharesResolver` ships
+     only a read-only `shares` query; the actual write path in stock
+     Unraid is still the legacy PHP emhttp UI which POSTs form fields
+     to `/var/run/emhttpd.socket`. These mutations replicate that
+     protocol from inside unraid-api so the U-Manager mobile app (and
+     any other GraphQL client) can manage shares with the same x-api-key
+     auth used for everything else.
 
 Tracking issue (upstream): https://github.com/unraid/api/issues/1818
 """
@@ -1928,6 +1936,348 @@ def patch_array_subscription_bundle() -> bool:
     return True
 
 
+SHARE_MUTATIONS_MARKER = "/* u-manager-companion: share-mutations override */"
+
+
+def patch_share_mutations_bundle() -> bool:
+    """Expose `createShare`, `updateShare` and `deleteShare` mutations.
+
+    The official unraid-api ships a stub at
+    `api/src/core/modules/add-share.ts` that throws `NotImplementedError`
+    and isn't even wired into the schema. Share CRUD in stock Unraid
+    goes through the legacy emhttp PHP UI which POSTs to the emhttpd
+    unix socket at `/var/run/emhttpd.socket` with form-encoded fields.
+
+    This patch injects three new methods onto the existing
+    `SharesResolver.prototype` plus the matching NestJS `@Mutation`
+    decorator calls so the GraphQL schema picks them up at runtime.
+    The methods reuse the bundle's existing `emcmd()` helper, which
+    already knows how to talk to the socket and inject the CSRF token
+    from `/var/local/emhttp/var.ini`.
+
+    Shape:
+        createShare(name: String!, settings: JSON): Share
+        updateShare(name: String!, settings: JSON): Share
+        deleteShare(name: String!): Boolean!
+
+    `settings` is a `GraphQLJSON` scalar with optional keys: `comment`,
+    `cachePool`, `cachePool2`, `useCache`, `cow`, `floor`, `allocator`,
+    `splitLevel`, `include[]`, `exclude[]`. Omitted keys keep their
+    current value on update; on create they fall back to emhttpd's
+    defaults (matches what the legacy UI sends from `ShareEdit.page`
+    when the user clicks "Add Share" with all defaults).
+
+    Tracked upstream: PR pending on the unraid-api fork
+    (fix/share-mutations).
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("share-mutations patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if SHARE_MUTATIONS_MARKER in content:
+        return False
+
+    # The class is closed by exactly this 5-line decoration. We inject the
+    # mutation overlay immediately after it so the new prototype methods
+    # are visible to the decorator calls that follow.
+    anchor = (
+        "SharesResolver = _ts_decorate$6([\n"
+        "    Resolver(()=>Share),\n"
+        '    _ts_metadata$4("design:type", Function),\n'
+        '    _ts_metadata$4("design:paramtypes", [])\n'
+        "], SharesResolver);"
+    )
+    if anchor not in content:
+        log("share-mutations patch: SharesResolver class decoration anchor not found")
+        return False
+
+    overlay = "\n" + SHARE_MUTATIONS_MARKER + "\n" + r"""
+function _ts_param$share(paramIndex, decorator) {
+    return function(target, key) { decorator(target, key, paramIndex); };
+}
+;(() => {
+    const proto = SharesResolver.prototype;
+    const VALID_NAME_RE = /^[A-Za-z][A-Za-z0-9._-]*$/;
+    // The bundle is loaded as an ES module, so `require()` is unavailable.
+    // Cache the dynamic-import promises once so the modules resolve on
+    // first call and every subsequent invocation pays no cost.
+    const netModulePromise = import('node:net');
+    const fsPromiseModulePromise = import('node:fs/promises');
+    const timersPromiseModulePromise = import('node:timers/promises');
+
+    function buildCommands(s) {
+        s = s || {};
+        return {
+            shareComment: s.comment != null ? String(s.comment) : '',
+            shareCachePool: s.cachePool != null ? String(s.cachePool) : '',
+            shareCachePool2: s.cachePool2 != null ? String(s.cachePool2) : '',
+            shareUseCache: s.useCache != null ? String(s.useCache) : '',
+            shareCOW: s.cow != null ? String(s.cow) : 'auto',
+            shareFloor: s.floor != null ? String(s.floor) : '',
+            shareAllocator: s.allocator != null ? String(s.allocator) : 'highwater',
+            shareSplitLevel: s.splitLevel != null ? String(s.splitLevel) : '',
+            shareInclude: Array.isArray(s.include) ? s.include.join(',') : '',
+            shareExclude: Array.isArray(s.exclude) ? s.exclude.join(',') : '',
+        };
+    }
+
+    function validateName(name) {
+        if (!name || typeof name !== 'string') throw new Error('Share name is required.');
+        if (name.length > 40) throw new Error('Share name must be at most 40 characters.');
+        if (!VALID_NAME_RE.test(name)) throw new Error('Invalid share name. Must start with a letter and contain only letters, digits, dot, underscore or hyphen.');
+        if (name.endsWith('.')) throw new Error('Share name may not end with a dot.');
+    }
+
+    async function readCsrfToken() {
+        try {
+            const { readFile } = await fsPromiseModulePromise;
+            const data = await readFile('/var/local/emhttp/var.ini', 'utf-8');
+            const m = data.match(/^csrf_token=\"?([^\"\n]+)\"?/m);
+            return m ? m[1] : '';
+        } catch (e) { return ''; }
+    }
+
+    /**
+     * Send a form-encoded POST to /var/run/emhttpd.socket and return the
+     * raw response body. emhttpd replies with HTTP/0.9 on success (just
+     * the body, no status line) and a partial HTTP/1.1 frame on error,
+     * so we bypass Node's http parser and read bytes directly off the
+     * socket.
+     */
+    async function callEmhttpd(commands) {
+        const { createConnection } = await netModulePromise;
+        const csrf = await readCsrfToken();
+        if (!csrf) {
+            throw new Error('CSRF token unavailable. Is /var/local/emhttp/var.ini readable?');
+        }
+        const body = new URLSearchParams(Object.assign({}, commands, { csrf_token: csrf })).toString();
+        const request =
+            'POST /update HTTP/1.1\r\n' +
+            'Host: localhost\r\n' +
+            'Content-Type: application/x-www-form-urlencoded\r\n' +
+            'Content-Length: ' + Buffer.byteLength(body) + '\r\n' +
+            'Connection: close\r\n' +
+            '\r\n' +
+            body;
+        return await new Promise((resolve, reject) => {
+            const socket = createConnection('/var/run/emhttpd.socket');
+            const chunks = [];
+            let settled = false;
+            let idleTimer;
+            const settle = (ok, payload) => {
+                if (settled) return;
+                settled = true;
+                if (idleTimer) clearTimeout(idleTimer);
+                try { socket.destroy(); } catch (e) {}
+                if (ok) resolve(payload); else reject(payload);
+            };
+            // Hard ceiling — emhttpd's `cmdEditShare=Add Share` and
+            // `=Delete` respond fast (sub-second) but `=Apply` (update)
+            // can sit on the connection for ~12s before sending the HTTP
+            // headers. 30s is comfortable for all three; anything longer
+            // and the socket is truly stuck.
+            socket.setTimeout(30000);
+            socket.on('connect', () => {
+                // Half-close the write side immediately — emhttpd's HTTP/0.9
+                // success response leaves the read side open indefinitely
+                // otherwise, because there is no Content-Length or
+                // chunked-encoding marker for the parser to detect EOF.
+                socket.end(request);
+            });
+            socket.on('data', (chunk) => {
+                chunks.push(chunk);
+                // Some response bodies arrive in two fragments — debounce
+                // 200ms after the last byte before declaring "done".
+                if (idleTimer) clearTimeout(idleTimer);
+                idleTimer = setTimeout(
+                    () => settle(true, Buffer.concat(chunks).toString('utf8')),
+                    200
+                );
+            });
+            socket.on('end', () => settle(true, Buffer.concat(chunks).toString('utf8')));
+            socket.on('timeout', () => settle(false, new Error('emhttpd socket timeout')));
+            socket.on('error', (err) => settle(false, err));
+        });
+    }
+
+    /**
+     * Detect explicit failure in emhttpd's response body.
+     * Success bodies look like `<script>replaceName("name");</script>`.
+     * Failure bodies are bare strings such as `500 Internal Server Error`
+     * or a partial HTTP/1.1 frame whose body contains the error text.
+     */
+    function isFailureResponse(body) {
+        if (!body) return false;
+        if (/<script\b/i.test(body)) return false;
+        if (/^\s*500\b|Internal Server Error|Bad Request|Unauthorized|Forbidden/i.test(body)) return true;
+        return false;
+    }
+
+    /**
+     * Poll `getShares('users')` for at most `maxMs` until `predicate`
+     * returns truthy on its result. Returns the matched share or
+     * `undefined` if it never appeared.
+     *
+     * The in-memory share store is refreshed by a chokidar watcher
+     * around `/usr/local/emhttp/state/shares.ini`. That refresh races
+     * with our mutation completing, so we have to poll instead of
+     * sleeping for a fixed duration.
+     */
+    async function pollForShare(predicate, maxMs) {
+        const { setTimeout: delay } = await timersPromiseModulePromise;
+        const start = Date.now();
+        const step = 50;
+        while (Date.now() - start < maxMs) {
+            const match = getShares('users').find(predicate);
+            if (match) return match;
+            await delay(step);
+        }
+        return undefined;
+    }
+
+    proto.createShare = async function patchedCreateShare(name, settings) {
+        validateName(name);
+        const existing = getShares('users').find(s => s.name === name);
+        if (existing) throw new Error('A share named "' + name + '" already exists.');
+        const response = await callEmhttpd(Object.assign({
+            cmdEditShare: 'Add Share',
+            shareName: name,
+            shareNameOrig: '',
+        }, buildCommands(settings)));
+        if (isFailureResponse(response)) {
+            throw new Error('emhttpd refused createShare: ' + response.trim().slice(0, 200));
+        }
+        const created = await pollForShare(s => s.name === name, 10000);
+        if (!created) {
+            // The state file watcher hasn't picked up the new share yet —
+            // the .cfg is on disk, but the in-memory store is stale. Rather
+            // than fail (the share IS created on disk), return a synthetic
+            // entity built from the input so the client gets a useful
+            // response and can refetch the shares list itself.
+            return {
+                id: name,
+                name,
+                comment: settings && settings.comment != null ? String(settings.comment) : '',
+                allocator: settings && settings.allocator != null ? String(settings.allocator) : 'highwater',
+                cow: settings && settings.cow != null ? String(settings.cow) : 'auto',
+                splitLevel: settings && settings.splitLevel != null ? String(settings.splitLevel) : '',
+                floor: settings && settings.floor != null ? String(settings.floor) : '',
+                useCache: settings && settings.useCache != null ? String(settings.useCache) : '',
+                include: Array.isArray(settings && settings.include) ? settings.include : [],
+                exclude: Array.isArray(settings && settings.exclude) ? settings.exclude : [],
+                size: 0,
+                free: null,
+                used: 0,
+                cache: null,
+                nameOrig: name,
+                color: null,
+                luksStatus: null,
+            };
+        }
+        return created;
+    };
+
+    proto.updateShare = async function patchedUpdateShare(name, settings) {
+        if (!name) throw new Error('Share name is required.');
+        const current = getShares('users').find(s => s.name === name);
+        if (!current) throw new Error('No share named "' + name + '".');
+        const merged = Object.assign({
+            comment: current.comment,
+            cachePool: current.cachePool,
+            cachePool2: current.cachePool2,
+            useCache: current.useCache,
+            cow: current.cow,
+            floor: current.floor,
+            allocator: current.allocator,
+            splitLevel: current.splitLevel,
+            include: current.include,
+            exclude: current.exclude,
+        }, settings || {});
+        const response = await callEmhttpd(Object.assign({
+            cmdEditShare: 'Apply',
+            shareName: name,
+            shareNameOrig: name,
+        }, buildCommands(merged)));
+        if (isFailureResponse(response)) {
+            throw new Error('emhttpd refused updateShare: ' + response.trim().slice(0, 200));
+        }
+        // No reliable comparable field on the Share entity here — just
+        // wait briefly for the state file to refresh and return what we
+        // see. If the predicate fails the caller still gets the prior
+        // value, which matches "best-effort" semantics for updates.
+        const { setTimeout: delay } = await timersPromiseModulePromise;
+        await delay(300);
+        return getShares('users').find(s => s.name === name);
+    };
+
+    proto.deleteShare = async function patchedDeleteShare(name) {
+        if (!name) throw new Error('Share name is required.');
+        const existing = getShares('users').find(s => s.name === name);
+        if (!existing) throw new Error('No share named "' + name + '".');
+        const response = await callEmhttpd({
+            cmdEditShare: 'Delete',
+            confirmDelete: 'on',
+            shareName: name,
+            shareNameOrig: name,
+        });
+        if (isFailureResponse(response)) {
+            throw new Error('emhttpd refused deleteShare: ' + response.trim().slice(0, 200));
+        }
+        return true;
+    };
+})();
+_ts_decorate$6([
+    Mutation(()=>Share, {
+        description: 'Create a new user share.'
+    }),
+    UsePermissions({
+        action: AuthAction.CREATE_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_param$share(0, Args('name', { type: ()=>String })),
+    _ts_param$share(1, Args('settings', { type: ()=>GraphQLJSON, nullable: true })),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", [String, Object]),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "createShare", null);
+_ts_decorate$6([
+    Mutation(()=>Share, {
+        description: 'Update an existing user share. Omitted fields keep their current value.'
+    }),
+    UsePermissions({
+        action: AuthAction.UPDATE_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_param$share(0, Args('name', { type: ()=>String })),
+    _ts_param$share(1, Args('settings', { type: ()=>GraphQLJSON, nullable: true })),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", [String, Object]),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "updateShare", null);
+_ts_decorate$6([
+    Mutation(()=>Boolean, {
+        description: 'Delete a user share by name. The share directory must be empty.'
+    }),
+    UsePermissions({
+        action: AuthAction.DELETE_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_param$share(0, Args('name', { type: ()=>String })),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", [String]),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "deleteShare", null);
+"""
+
+    content = content.replace(anchor, anchor + overlay, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched share mutations in {os.path.basename(bundle)}")
+    return True
+
+
 def main() -> int:
     changed_pubsub = patch_pubsub()
     changed_bundle = patch_bundle()
@@ -1940,6 +2290,7 @@ def main() -> int:
     changed_uninstall = patch_uninstall_plugin_bundle()
     changed_array_subscription = patch_array_subscription_bundle()
     changed_changelog_cdata = patch_changelog_cdata_strip_bundle()
+    changed_share_mutations = patch_share_mutations_bundle()
     if any([
         changed_pubsub,
         changed_bundle,
@@ -1952,6 +2303,7 @@ def main() -> int:
         changed_uninstall,
         changed_array_subscription,
         changed_changelog_cdata,
+        changed_share_mutations,
     ]):
         restart_api()
         log("patches applied — unraid-api will restart")

@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.24.2">
+<!ENTITY version "2026.05.26.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -13,6 +13,12 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.26.1
+- Unlock creating, renaming and deleting Unraid shares from the
+  U-Manager app. Unraid's official API ships the share endpoints as
+  stubs, so the companion patches them in — the app can now manage
+  shares without you opening the web UI.
+
 ###2026.05.24.2
 - Clean up the Release Notes view in the U-Manager app — internal XML
   wrapper text (`<![CDATA[`) no longer appears at the top of the

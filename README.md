@@ -241,6 +241,28 @@ The patch rewrites the action map to use the same field names the web UI submits
 | After pause  | 1 655 644 (saved) |
 | After resume | 2 395 484 (continued growing) |
 
+### 5. Share CRUD mutations — `createShare`, `updateShare`, `deleteShare`
+
+- **Type:** missing feature
+- **Upstream tracking:** the official `SharesResolver` ships only a read-only `shares` query. There's a stub at `api/src/core/modules/add-share.ts` that literally throws `NotImplementedError` and isn't wired into the schema. PR pending on the unraid-api fork.
+- **Why U-Manager needs it:** the app needs to create, edit and delete user shares from the phone — the same flow the web UI exposes under **Shares → Add Share**. Without these mutations the app would have to either reach the legacy `/update.htm` PHP endpoint (which requires a session cookie + CSRF token, breaking the API-key-only auth model) or push users back to the web UI.
+
+The legacy web UI POSTs `cmdEditShare=Add Share` / `=Apply` / `=Delete` with form-encoded fields to `/var/run/emhttpd.socket`, with a CSRF token read from `/var/local/emhttp/var.ini`. emhttpd writes a `.cfg` to `/boot/config/shares/<name>.cfg` and creates `/mnt/user/<name>/`. The patch reproduces that exact protocol from inside unraid-api: the resolver methods open a unix-socket connection, send a raw HTTP request, and parse emhttpd's HTTP/0.9 (success) or HTTP/1.1 (error) reply.
+
+GraphQL shape:
+
+```graphql
+mutation {
+  createShare(name: "downloads", settings: { comment: "Torrent downloads", allocator: "highwater" }) { ... Share }
+  updateShare(name: "downloads", settings: { comment: "Updated" })                                   { ... Share }
+  deleteShare(name: "downloads")
+}
+```
+
+`settings` is a `GraphQLJSON` scalar with optional keys: `comment`, `cachePool`, `cachePool2`, `useCache`, `cow`, `floor`, `allocator`, `splitLevel`, `include[]`, `exclude[]`. On update, omitted keys keep their current value (the resolver merges the partial against the existing share before sending to emhttpd, because `cmdEditShare=Apply` is destructive on omitted fields).
+
+Permissions follow the standard pattern — `CREATE_ANY` / `UPDATE_ANY` / `DELETE_ANY` on `Resource.SHARE`. The name regex matches what `ShareEdit.page` enforces client-side: 1-40 chars, starts with a letter, only `[A-Za-z0-9._-]`, may not end with a dot.
+
 ---
 
 ## How idempotency works
