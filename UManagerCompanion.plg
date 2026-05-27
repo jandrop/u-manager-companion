@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.26.1">
+<!ENTITY version "2026.05.27.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -13,6 +13,18 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.27.1
+- Expose extra share data to the U-Manager app: primary / secondary
+  cache pool, cache usage mode (yes/no/only/prefer) and the per-disk
+  "Exclude from shares" flag. Without these the app could only show
+  a partial picture of each share — now the share editor matches
+  what the web UI shows.
+- Unlock SMB security editing from the U-Manager app. The app can now
+  toggle export, case sensitivity, public/secure/private security
+  mode and per-user access (read/write, read-only, no access) for
+  every share — same flow as Unraid's web "SMB Security Settings"
+  panel.
+
 ###2026.05.26.1
 - Unlock creating, renaming and deleting Unraid shares from the
   U-Manager app. Unraid's official API ships the share endpoints as

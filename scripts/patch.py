@@ -1937,6 +1937,244 @@ def patch_array_subscription_bundle() -> bool:
 
 
 SHARE_MUTATIONS_MARKER = "/* u-manager-companion: share-mutations override */"
+SHARE_EXTRA_FIELDS_MARKER = "/* u-manager-companion: share-extra-fields */"
+
+
+def patch_share_extra_fields_bundle() -> bool:
+    """Expose `useCache`, `cachePool` and `cachePool2` on the `Share`
+    GraphQL type.
+
+    The official `Share` ObjectType ships only a derived `cache: Boolean`
+    field. The underlying `.cfg` stores three distinct values
+    (`shareUseCache`, `shareCachePool`, `shareCachePool2`) that the
+    mobile app needs to render the share editor in the right initial
+    state — without them, "edit share" cannot pre-populate the
+    primary/secondary storage dropdowns and the useCache mode.
+
+    The `Share` class lives in `index-*.js` (alongside the other GraphQL
+    models), not the main `plugin.module-*.js` patched elsewhere. We
+    inject three `_ts_decorate([Field(...)], Share.prototype, "...", void 0)`
+    blocks right before the final `Share = _ts_decorate([ObjectType(...)],
+    Share);` line. The runtime entity returned by `getShares('users')`
+    already has these properties (parsed from `shares.ini`), so all we
+    need is the GraphQL decoration to expose them.
+
+    Tracked upstream: PR pending on the unraid-api fork
+    (fix/share-mutations).
+    """
+    candidates = glob.glob(INDEX_BUNDLE_GLOB)
+    bundle = next(
+        (
+            p
+            for p in candidates
+            if "], Share.prototype, \"luksStatus\", void 0);" in open(p).read()
+        ),
+        None,
+    )
+    if not bundle:
+        log("share-extra-fields patch: index bundle with Share class not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if SHARE_EXTRA_FIELDS_MARKER in content:
+        return False
+
+    # The class is finalised by exactly this snippet — inject the new
+    # field decorators directly before it so they decorate the
+    # prototype before the ObjectType class decorator finalises Share.
+    anchor = (
+        "], Share.prototype, \"luksStatus\", void 0);\n"
+        "Share = _ts_decorate([\n"
+    )
+    if anchor not in content:
+        log("share-extra-fields patch: anchor not found in index bundle")
+        return False
+
+    extra_fields = (
+        SHARE_EXTRA_FIELDS_MARKER + "\n"
+        "_ts_decorate([\n"
+        "    Field(()=>String, {\n"
+        "        description: 'Raw cache usage mode written to the share .cfg (\"\", \"no\", \"yes\", \"prefer\", \"only\").',\n"
+        "        nullable: true\n"
+        "    }),\n"
+        "    _ts_metadata(\"design:type\", Object)\n"
+        "], Share.prototype, \"useCache\", void 0);\n"
+        "_ts_decorate([\n"
+        "    Field(()=>String, {\n"
+        "        description: 'Primary storage pool name (e.g. \"cache\"). Empty when the share lives on the array.',\n"
+        "        nullable: true\n"
+        "    }),\n"
+        "    _ts_metadata(\"design:type\", Object)\n"
+        "], Share.prototype, \"cachePool\", void 0);\n"
+        "_ts_decorate([\n"
+        "    Field(()=>String, {\n"
+        "        description: 'Secondary storage pool name. Empty when no secondary pool is configured.',\n"
+        "        nullable: true\n"
+        "    }),\n"
+        "    _ts_metadata(\"design:type\", Object)\n"
+        "], Share.prototype, \"cachePool2\", void 0);\n"
+    )
+
+    content = content.replace(
+        anchor,
+        "], Share.prototype, \"luksStatus\", void 0);\n"
+        + extra_fields
+        + "Share = _ts_decorate([\n",
+        1,
+    )
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched share extra fields in {os.path.basename(bundle)}")
+    return True
+
+
+SHARES_PARSER_OLD = "cache: useCache === 'yes',"
+SHARES_PARSER_NEW = "useCache,\n            cache: useCache === 'yes',"
+
+ARRAY_DISK_SHARE_ENABLED_MARKER = (
+    "/* u-manager-companion: array-disk-share-enabled */"
+)
+SLOTS_PARSER_OLD = (
+    "isSpinning: slot.spundown ? slot.spundown === '0' : null"
+)
+SLOTS_PARSER_NEW = (
+    "isSpinning: slot.spundown ? slot.spundown === '0' : null,\n"
+    "            shareEnabled: slot.shareEnabled !== undefined "
+    "? toBoolean(slot.shareEnabled) : null"
+)
+
+
+def patch_array_disk_share_enabled_bundle() -> bool:
+    """Expose `shareEnabled` on the `ArrayDisk` GraphQL type.
+
+    Pool entries in `disks.ini` carry a `shareEnabled="yes"|"no"` flag
+    that controls whether the pool is selectable as primary/secondary
+    storage in the legacy share editor. The official `ArrayDisk` does
+    not expose it, so the mobile share editor can't replicate the web
+    UI's filtering and ends up offering pools that the user already
+    disabled in Pool Settings.
+
+    Same shape as `patch_share_extra_fields_bundle()` — injects a
+    single `_ts_decorate([Field(...)], ArrayDisk.prototype, "shareEnabled",
+    void 0)` block before the final ObjectType class decoration in
+    `index-*.js`. Runtime values are populated by the companion's
+    sibling slots-parser patch.
+
+    Tracked upstream: PR pending on the unraid-api fork
+    (fix/share-mutations).
+    """
+    candidates = glob.glob(INDEX_BUNDLE_GLOB)
+    bundle = next(
+        (
+            p
+            for p in candidates
+            if '], ArrayDisk.prototype, "isSpinning", void 0);' in open(p).read()
+        ),
+        None,
+    )
+    if not bundle:
+        log("array-disk-share-enabled: index bundle with ArrayDisk not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if ARRAY_DISK_SHARE_ENABLED_MARKER in content:
+        return False
+
+    anchor = (
+        '], ArrayDisk.prototype, "isSpinning", void 0);\n'
+        "ArrayDisk = _ts_decorate([\n"
+    )
+    if anchor not in content:
+        log("array-disk-share-enabled: anchor not found")
+        return False
+
+    field_block = (
+        ARRAY_DISK_SHARE_ENABLED_MARKER + "\n"
+        "_ts_decorate([\n"
+        "    Field(()=>Boolean, {\n"
+        "        nullable: true,\n"
+        "        description: 'For pool devices, whether the pool is allowed to back user shares (`shareEnabled` flag from disks.ini).'\n"
+        "    }),\n"
+        "    _ts_metadata(\"design:type\", Object)\n"
+        "], ArrayDisk.prototype, \"shareEnabled\", void 0);\n"
+    )
+
+    content = content.replace(
+        anchor,
+        '], ArrayDisk.prototype, "isSpinning", void 0);\n'
+        + field_block
+        + "ArrayDisk = _ts_decorate([\n",
+        1,
+    )
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched ArrayDisk.shareEnabled in {os.path.basename(bundle)}")
+    return True
+
+
+def patch_slots_parser_share_enabled_bundle() -> bool:
+    """Preserve `shareEnabled` on parsed ArrayDisk entities.
+
+    The slots parser at `api/src/store/state-parsers/slots.ts`
+    constructs each `ArrayDisk` result with an explicit field list
+    that excludes `shareEnabled` — even though the source ini entry
+    has it for pool devices. The complementary
+    `patch_array_disk_share_enabled_bundle` patch exposes the
+    GraphQL field, but without this passthrough the resolver reads
+    `undefined` from every entity.
+
+    Idempotent via substring check on the new assignment.
+    Tracked upstream: PR pending on the unraid-api fork
+    (fix/share-mutations).
+    """
+    candidates = glob.glob("/usr/local/unraid-api/dist/assets/slots-*.js")
+    bundle = next(
+        (p for p in candidates if SLOTS_PARSER_OLD in open(p).read()),
+        None,
+    )
+    if not bundle:
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if "shareEnabled: slot.shareEnabled" in content:
+        return False
+    content = content.replace(SLOTS_PARSER_OLD, SLOTS_PARSER_NEW, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched slots parser shareEnabled passthrough in {os.path.basename(bundle)}")
+    return True
+
+
+def patch_shares_parser_use_cache_bundle() -> bool:
+    """Preserve `useCache` on parsed share entities.
+
+    The state parser at `api/src/store/state-parsers/shares.ts`
+    destructures `useCache` from the ini and uses it only to derive
+    `cache: useCache === 'yes'` — the raw `useCache` value is dropped.
+    The companion's `patch_share_extra_fields_bundle()` exposes a
+    `useCache` GraphQL field, so this complementary patch makes sure
+    the runtime entity actually carries the value the resolver reads.
+
+    Idempotent via the `useCache,\\n            cache: useCache` check.
+    Tracked upstream: PR pending on the unraid-api fork
+    (fix/share-mutations).
+    """
+    candidates = glob.glob("/usr/local/unraid-api/dist/assets/shares-*.js")
+    bundle = next(
+        (p for p in candidates if SHARES_PARSER_OLD in open(p).read()),
+        None,
+    )
+    if not bundle:
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if "useCache,\n            cache: useCache" in content:
+        return False
+    content = content.replace(SHARES_PARSER_OLD, SHARES_PARSER_NEW, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched shares parser useCache passthrough in {os.path.basename(bundle)}")
+    return True
 
 
 def patch_share_mutations_bundle() -> bool:
@@ -2278,6 +2516,270 @@ _ts_decorate$6([
     return True
 
 
+SHARE_SECURITY_MARKER = "/* u-manager-companion: share-security override */"
+
+def patch_share_security_bundle() -> bool:
+    """Expose SMB security state + mutations for the share editor's
+    second-step flow.
+
+    The legacy web UI's `SecuritySMB.page` is a separate page that
+    edits per-share `export` / `caseSensitive` / `security` /
+    `readList` / `writeList` / `volsizelimit` and a per-user access
+    matrix (read-write / read-only / no-access). Backend POSTs use
+    two emhttpd commands distinct from share CRUD:
+
+      * `changeShareSecurity=Apply` with shareName + shareExport +
+        shareSecurity + shareCaseSensitive + shareVolsizelimit
+      * `changeShareAccess=Apply` with shareName +
+        `userAccess.<idx>=read-write|read-only|no-access` per user
+
+    We expose three new GraphQL fields on `SharesResolver`:
+
+      shareSecurity(name): JSON       — current SMB security blob
+      shareSecurityUsers: JSON        — array of {id, name, isRoot}
+      updateShareSecurity(name, settings): Boolean
+      updateShareAccess(name, access): Boolean
+
+    The `users` and `shareSecurity` shapes are returned as the raw
+    `GraphQLJSON` scalar — the client deserialises them. Same pattern
+    as the existing share mutations.
+
+    Tracked upstream: PR pending on the unraid-api fork
+    (fix/share-security).
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("share-security patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if SHARE_SECURITY_MARKER in content:
+        return False
+
+    # We chain after the share-mutations overlay, which itself sits
+    # right after `SharesResolver = _ts_decorate$6([...], SharesResolver);`.
+    # The chain is robust because we anchor on the marker of the
+    # previous patch — that marker is guaranteed present whenever
+    # share mutations are active (and we always run them before
+    # share-security in main()).
+    anchor = SHARE_MUTATIONS_MARKER
+    if anchor not in content:
+        log(
+            "share-security patch: share-mutations marker not present; "
+            "the security overlay depends on it being applied first"
+        )
+        return False
+
+    # Find the END of the share-mutations overlay so we can insert
+    # AFTER it. Use the last decorator block of that overlay as the
+    # tail anchor — it ends with `..., "deleteShare", null);`.
+    tail = '], SharesResolver.prototype, "deleteShare", null);\n'
+    tail_idx = content.find(tail, content.find(anchor))
+    if tail_idx == -1:
+        log("share-security patch: share-mutations tail not found")
+        return False
+    insert_at = tail_idx + len(tail)
+
+    overlay = "\n" + SHARE_SECURITY_MARKER + "\n" + r"""
+;(() => {
+    const proto = SharesResolver.prototype;
+    // Reuse the dynamic-import promises declared by the share-mutations
+    // overlay — they're already in module scope thanks to that earlier
+    // injection.
+    const netModulePromiseSec = import('node:net');
+    const fsPromiseModulePromiseSec = import('node:fs/promises');
+    const iniModulePromiseSec = import('ini');
+    const timersPromiseModulePromiseSec = import('node:timers/promises');
+
+    async function readCsrfTokenSec() {
+        try {
+            const { readFile } = await fsPromiseModulePromiseSec;
+            const data = await readFile('/var/local/emhttp/var.ini', 'utf-8');
+            const m = data.match(/^csrf_token=\"?([^\"\n]+)\"?/m);
+            return m ? m[1] : '';
+        } catch (e) { return ''; }
+    }
+
+    async function callEmhttpdSec(commands) {
+        const { createConnection } = await netModulePromiseSec;
+        const csrf = await readCsrfTokenSec();
+        if (!csrf) throw new Error('CSRF token unavailable.');
+        const body = new URLSearchParams(Object.assign({}, commands, { csrf_token: csrf })).toString();
+        const request =
+            'POST /update HTTP/1.1\r\n' +
+            'Host: localhost\r\n' +
+            'Content-Type: application/x-www-form-urlencoded\r\n' +
+            'Content-Length: ' + Buffer.byteLength(body) + '\r\n' +
+            'Connection: close\r\n' +
+            '\r\n' +
+            body;
+        return await new Promise((resolve, reject) => {
+            const socket = createConnection('/var/run/emhttpd.socket');
+            const chunks = [];
+            let settled = false;
+            let idleTimer;
+            const settle = (ok, payload) => {
+                if (settled) return;
+                settled = true;
+                if (idleTimer) clearTimeout(idleTimer);
+                try { socket.destroy(); } catch (e) {}
+                if (ok) resolve(payload); else reject(payload);
+            };
+            socket.setTimeout(30000);
+            socket.on('connect', () => socket.end(request));
+            socket.on('data', (chunk) => {
+                chunks.push(chunk);
+                if (idleTimer) clearTimeout(idleTimer);
+                idleTimer = setTimeout(
+                    () => settle(true, Buffer.concat(chunks).toString('utf8')),
+                    200
+                );
+            });
+            socket.on('end', () => settle(true, Buffer.concat(chunks).toString('utf8')));
+            socket.on('timeout', () => settle(false, new Error('emhttpd socket timeout')));
+            socket.on('error', (err) => settle(false, err));
+        });
+    }
+
+    function isFailureResponseSec(body) {
+        if (!body) return false;
+        if (/<script\b/i.test(body)) return false;
+        if (/^\s*500\b|Internal Server Error|Bad Request|Unauthorized|Forbidden/i.test(body)) return true;
+        return false;
+    }
+
+    proto.shareSecurity = async function patchedShareSecurity(name) {
+        if (!name) throw new Error('Share name is required.');
+        const share = getShares('users').find(s => s.name === name);
+        if (!share) throw new Error('No share named "' + name + '".');
+        // share.smb is the processShare-merged SMB security blob.
+        const smb = share.smb || {};
+        return {
+            export: smb.export || share.export || '-',
+            security: smb.security || share.security || 'public',
+            caseSensitive: smb.caseSensitive || share.caseSensitive || 'auto',
+            readList: Array.isArray(smb.readList) ? smb.readList : (share.readList ? String(share.readList).split(',').filter(Boolean) : []),
+            writeList: Array.isArray(smb.writeList) ? smb.writeList : (share.writeList ? String(share.writeList).split(',').filter(Boolean) : []),
+            volsizelimit: (smb.timemachine && smb.timemachine.volsizelimit) || share.volsizelimit || '',
+        };
+    };
+
+    proto.shareSecurityUsers = async function patchedShareSecurityUsers() {
+        try {
+            const { readFile } = await fsPromiseModulePromiseSec;
+            const ini = await iniModulePromiseSec;
+            const content = await readFile('/usr/local/emhttp/state/users.ini', 'utf-8');
+            const parsed = ini.parse ? ini.parse(content) : ini.default.parse(content);
+            return Object.entries(parsed).map(([key, data]) => ({
+                id: String(data.idx ?? key),
+                name: data.name || key,
+                description: data.desc || '',
+                isRoot: (data.name || key) === 'root',
+            }));
+        } catch (e) {
+            return [];
+        }
+    };
+
+    proto.updateShareSecurity = async function patchedUpdateShareSecurity(name, settings) {
+        if (!name) throw new Error('Share name is required.');
+        settings = settings || {};
+        const response = await callEmhttpdSec({
+            changeShareSecurity: 'Apply',
+            shareName: name,
+            shareExport: settings.export != null ? String(settings.export) : '-',
+            shareSecurity: settings.security != null ? String(settings.security) : 'public',
+            shareCaseSensitive: settings.caseSensitive != null ? String(settings.caseSensitive) : 'auto',
+            shareVolsizelimit: settings.volsizelimit != null ? String(settings.volsizelimit) : '',
+        });
+        if (isFailureResponseSec(response)) {
+            throw new Error('emhttpd refused updateShareSecurity: ' + response.trim().slice(0, 200));
+        }
+        const { setTimeout: delay } = await timersPromiseModulePromiseSec;
+        await delay(150);
+        return true;
+    };
+
+    proto.updateShareAccess = async function patchedUpdateShareAccess(name, access) {
+        if (!name) throw new Error('Share name is required.');
+        if (!Array.isArray(access)) throw new Error('access must be a list of {userId, access} entries.');
+        const payload = { changeShareAccess: 'Apply', shareName: name };
+        for (const entry of access) {
+            if (!entry || entry.userId == null) continue;
+            const value = String(entry.access || 'no-access');
+            payload['userAccess.' + String(entry.userId)] = value;
+        }
+        const response = await callEmhttpdSec(payload);
+        if (isFailureResponseSec(response)) {
+            throw new Error('emhttpd refused updateShareAccess: ' + response.trim().slice(0, 200));
+        }
+        const { setTimeout: delay } = await timersPromiseModulePromiseSec;
+        await delay(150);
+        return true;
+    };
+})();
+_ts_decorate$6([
+    Query(()=>GraphQLJSON, {
+        description: 'Current SMB security state for a user share.'
+    }),
+    UsePermissions({
+        action: AuthAction.READ_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_param$share(0, Args('name', { type: ()=>String })),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", [String]),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "shareSecurity", null);
+_ts_decorate$6([
+    Query(()=>GraphQLJSON, {
+        description: 'List of Unraid users available for share access control.'
+    }),
+    UsePermissions({
+        action: AuthAction.READ_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", []),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "shareSecurityUsers", null);
+_ts_decorate$6([
+    Mutation(()=>Boolean, {
+        description: 'Update SMB security for a share (export, security mode, case-sensitive, Time Machine size).'
+    }),
+    UsePermissions({
+        action: AuthAction.UPDATE_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_param$share(0, Args('name', { type: ()=>String })),
+    _ts_param$share(1, Args('settings', { type: ()=>GraphQLJSON, nullable: true })),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", [String, Object]),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "updateShareSecurity", null);
+_ts_decorate$6([
+    Mutation(()=>Boolean, {
+        description: 'Update per-user access for a share (read-write/read-only/no-access by user id).'
+    }),
+    UsePermissions({
+        action: AuthAction.UPDATE_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_param$share(0, Args('name', { type: ()=>String })),
+    _ts_param$share(1, Args('access', { type: ()=>GraphQLJSON })),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", [String, Object]),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "updateShareAccess", null);
+"""
+
+    content = content[:insert_at] + overlay + content[insert_at:]
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched share security in {os.path.basename(bundle)}")
+    return True
+
+
 def main() -> int:
     changed_pubsub = patch_pubsub()
     changed_bundle = patch_bundle()
@@ -2291,6 +2793,11 @@ def main() -> int:
     changed_array_subscription = patch_array_subscription_bundle()
     changed_changelog_cdata = patch_changelog_cdata_strip_bundle()
     changed_share_mutations = patch_share_mutations_bundle()
+    changed_share_security = patch_share_security_bundle()
+    changed_share_extra_fields = patch_share_extra_fields_bundle()
+    changed_shares_parser = patch_shares_parser_use_cache_bundle()
+    changed_array_disk_share_enabled = patch_array_disk_share_enabled_bundle()
+    changed_slots_parser = patch_slots_parser_share_enabled_bundle()
     if any([
         changed_pubsub,
         changed_bundle,
@@ -2304,6 +2811,11 @@ def main() -> int:
         changed_array_subscription,
         changed_changelog_cdata,
         changed_share_mutations,
+        changed_share_security,
+        changed_share_extra_fields,
+        changed_shares_parser,
+        changed_array_disk_share_enabled,
+        changed_slots_parser,
     ]):
         restart_api()
         log("patches applied — unraid-api will restart")
