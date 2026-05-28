@@ -251,9 +251,9 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      (Unraid replays plg install on boot). Invoke via bash because
      /boot is a FAT filesystem that never honours the executable bit,
      so `chmod +x` is a no-op and direct execution fails with
-     "Permission denied". --no-same-owner avoids "Cannot change
-     ownership" warnings when extracting as a uid the source machine
-     doesn't have. -->
+     "Permission denied". The `no-same-owner` flag on tar avoids
+     "Cannot change ownership" warnings when extracting as a uid
+     the source machine does not have. -->
 <FILE Run="/bin/bash">
 <INLINE>
 echo ""
