@@ -9,7 +9,6 @@
 <!ENTITY icon "https://raw.githubusercontent.com/&github;/main/assets/icon.png">
 <!ENTITY tarball "&plgdir;/source.tar.gz">
 <!ENTITY tarballURL "https://github.com/&github;/releases/download/&version;/companion-&version;.tar.gz">
-<!ENTITY tarballSHA "569c98c86153e93be315c0ca435652bbef2be2fdcb1c9f946bd9e38710d5de22">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&icon;" min="6.11.0" support="https://github.com/&github;/issues">
@@ -243,7 +242,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>&tarballSHA;</SHA256>
+<SHA256>569c98c86153e93be315c0ca435652bbef2be2fdcb1c9f946bd9e38710d5de22</SHA256>
 </FILE>
 
 <!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
