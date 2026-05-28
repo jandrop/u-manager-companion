@@ -51,7 +51,7 @@ cd scripts
     --no-xattrs \
     --exclude='__pycache__' \
     --exclude='._*' \
-    -cf - patch.py companion \
+    -cf - patch.py apply.sh watcher.sh companion \
   | gzip -n -9 > "../${OUT}"
 cd ..
 

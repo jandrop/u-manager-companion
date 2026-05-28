@@ -2,17 +2,27 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.29.1">
+<!ENTITY version "2026.05.29.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
 <!ENTITY icon "https://raw.githubusercontent.com/&github;/main/assets/icon.png">
+<!ENTITY tarball "&plgdir;/source.tar.gz">
+<!ENTITY tarballURL "https://github.com/&github;/releases/download/&version;/companion-&version;.tar.gz">
+<!ENTITY tarballSHA "569c98c86153e93be315c0ca435652bbef2be2fdcb1c9f946bd9e38710d5de22">
 ]>
 
 <PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&icon;" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
 <![CDATA[
+###2026.05.29.2
+- Internal refactor only: no user-visible changes. Patch script
+  is now distributed as a versioned tarball published with each
+  release instead of loose files fetched from `main`, so the
+  plugin install pins to an exact, hash-verified payload. Same
+  patches, same behaviour as 2026.05.29.1.
+
 ###2026.05.29.1
 - Stop waking spun-down disks every time the U-Manager app
   refreshes. Unraid's official `disks` GraphQL resolver was running
@@ -227,23 +237,24 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 </INLINE>
 </FILE>
 
-<!-- Fetch the patch script from GitHub on every install/upgrade -->
-<FILE Name="&plgdir;/patch.py">
-<URL>https://raw.githubusercontent.com/&github;/main/scripts/patch.py</URL>
+<!-- Fetch the versioned source tarball from the matching GitHub
+     release. The SHA256 below is verified by Unraid's plugin command
+     before the install script below runs, so a tampered or stale
+     CDN copy aborts the install instead of installing broken code. -->
+<FILE Name="&tarball;">
+<URL>&tarballURL;</URL>
+<SHA256>&tarballSHA;</SHA256>
 </FILE>
 
-<FILE Name="&plgdir;/apply.sh">
-<URL>https://raw.githubusercontent.com/&github;/main/scripts/apply.sh</URL>
-</FILE>
-
-<FILE Name="&plgdir;/watcher.sh">
-<URL>https://raw.githubusercontent.com/&github;/main/scripts/watcher.sh</URL>
-</FILE>
-
-<!-- Run the patcher on install AND on every boot (Unraid replays plg install on
-     boot). Invoke apply.sh via bash because /boot is a FAT filesystem and
-     never honours the executable bit, so `chmod +x` is a no-op and direct
-     execution fails with "Permission denied". -->
+<!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
+     watcher.sh and the companion/ Python package at the root) and
+     hand control off to apply.sh. Runs on install AND on every boot
+     (Unraid replays plg install on boot). Invoke via bash because
+     /boot is a FAT filesystem that never honours the executable bit,
+     so `chmod +x` is a no-op and direct execution fails with
+     "Permission denied". --no-same-owner avoids "Cannot change
+     ownership" warnings when extracting as a uid the source machine
+     doesn't have. -->
 <FILE Run="/bin/bash">
 <INLINE>
 echo ""
@@ -251,6 +262,8 @@ echo "--------------------------------------------"
 echo " Installing &name; v&version;"
 echo "--------------------------------------------"
 echo ""
+tar --no-same-owner -xzf &tarball; -C &plgdir;
+rm -f &tarball;
 bash &plgdir;/apply.sh
 echo ""
 echo " &name; installed."
