@@ -2516,7 +2516,15 @@ _ts_decorate$6([
     return True
 
 
-SHARE_SECURITY_MARKER = "/* u-manager-companion: share-security override */"
+SHARE_SECURITY_MARKER = "/* u-manager-companion: share-security override v2 */"
+# Legacy marker from v1 of this patch — the v1 `shareSecurity` resolver
+# read fields off `getShares('users')` which never carries SMB security
+# data (that lives in /usr/local/emhttp/state/sec.ini). v2 reads sec.ini
+# directly. We strip the v1 block on every apply so existing installs
+# migrate cleanly.
+SHARE_SECURITY_LEGACY_MARKER = (
+    "/* u-manager-companion: share-security override */"
+)
 
 def patch_share_security_bundle() -> bool:
     """Expose SMB security state + mutations for the share editor's
@@ -2553,6 +2561,26 @@ def patch_share_security_bundle() -> bool:
         return False
     with open(bundle, "r") as f:
         content = f.read()
+
+    # ── Legacy cleanup ───────────────────────────────────────────────
+    # If v1 of the patch is in the bundle, strip the entire block
+    # before re-applying v2. The v1 block always ends at the
+    # updateShareAccess `_ts_decorate$6(...)` closing call — anchor
+    # the regex on that to stay precise.
+    if SHARE_SECURITY_LEGACY_MARKER in content:
+        legacy_pattern = re.compile(
+            re.escape(SHARE_SECURITY_LEGACY_MARKER)
+            + r".*?\], SharesResolver\.prototype, \"updateShareAccess\", null\);\n?",
+            re.DOTALL,
+        )
+        new_content, removed = legacy_pattern.subn("", content, count=1)
+        if removed:
+            content = new_content
+            with open(bundle, "w") as f:
+                f.write(content)
+            log("share-security patch: removed legacy v1 block")
+            # Re-read so subsequent anchors still match the fresh content.
+
     if SHARE_SECURITY_MARKER in content:
         return False
 
@@ -2652,15 +2680,28 @@ def patch_share_security_bundle() -> bool:
         if (!name) throw new Error('Share name is required.');
         const share = getShares('users').find(s => s.name === name);
         if (!share) throw new Error('No share named "' + name + '".');
-        // share.smb is the processShare-merged SMB security blob.
-        const smb = share.smb || {};
+        // The SMB security blob lives in /usr/local/emhttp/state/sec.ini,
+        // not in shares.ini. `getShares('users')` only returns
+        // shares.ini-derived data, so it never carries `export`,
+        // `caseSensitive`, `security`, `readList`, `writeList` or
+        // `volsizelimit`. Read sec.ini directly to get the real
+        // current state — any IO/parse error falls back to defaults
+        // so a missing sec.ini doesn't break the editor entirely.
+        let sec = {};
+        try {
+            const { readFile } = await fsPromiseModulePromiseSec;
+            const ini = await iniModulePromiseSec;
+            const content = await readFile('/usr/local/emhttp/state/sec.ini', 'utf-8');
+            const parsed = ini.parse ? ini.parse(content) : ini.default.parse(content);
+            sec = parsed[name] || {};
+        } catch (e) { /* defaults below */ }
         return {
-            export: smb.export || share.export || '-',
-            security: smb.security || share.security || 'public',
-            caseSensitive: smb.caseSensitive || share.caseSensitive || 'auto',
-            readList: Array.isArray(smb.readList) ? smb.readList : (share.readList ? String(share.readList).split(',').filter(Boolean) : []),
-            writeList: Array.isArray(smb.writeList) ? smb.writeList : (share.writeList ? String(share.writeList).split(',').filter(Boolean) : []),
-            volsizelimit: (smb.timemachine && smb.timemachine.volsizelimit) || share.volsizelimit || '',
+            export: sec.export || '-',
+            security: sec.security || 'public',
+            caseSensitive: sec.caseSensitive || 'auto',
+            readList: sec.readList ? String(sec.readList).split(',').filter(Boolean) : [],
+            writeList: sec.writeList ? String(sec.writeList).split(',').filter(Boolean) : [],
+            volsizelimit: sec.volsizelimit != null ? String(sec.volsizelimit) : '',
         };
     };
 

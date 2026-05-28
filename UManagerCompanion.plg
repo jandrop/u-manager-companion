@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.28.1">
+<!ENTITY version "2026.05.28.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -13,6 +13,12 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.28.2
+- U-Manager app: fix the share Security editor showing the wrong
+  export mode and an empty Time Machine size for shares that had
+  them set. The security info is now read straight from the live
+  SMB state file, matching what Unraid's web UI displays.
+
 ###2026.05.28.1
 - U-Manager app: the share editor's Delete button now only appears
   when the share's folder is empty, matching Unraid's web UI. This
