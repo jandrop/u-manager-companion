@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.28.2">
+<!ENTITY version "2026.05.29.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -13,6 +13,16 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.29.1
+- Stop waking spun-down disks every time the U-Manager app
+  refreshes. Unraid's official `disks` GraphQL resolver was running
+  a full SMART read per disk on every call, which spun up modern
+  large drives (Seagate Exos and WD Gold of 16 TB or more) out of
+  standby — even when the app only asked for disk identifiers. The
+  companion now reads identity from sysfs and only consults SMART
+  for drives that are already spinning, matching what Unraid's web
+  UI does. Upstream tracked at unraid/api#2018.
+
 ###2026.05.28.2
 - U-Manager app: fix the share Security editor showing the wrong
   export mode and an empty Time Machine size for shares that had
