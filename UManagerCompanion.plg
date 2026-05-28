@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.27.1">
+<!ENTITY version "2026.05.28.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -13,6 +13,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.28.1
+- U-Manager app: the share editor's Delete button now only appears
+  when the share's folder is empty, matching Unraid's web UI. This
+  prevents accidental presses that would have failed silently.
+
 ###2026.05.27.1
 - Expose extra share data to the U-Manager app: primary / secondary
   cache pool, cache usage mode (yes/no/only/prefer) and the per-disk

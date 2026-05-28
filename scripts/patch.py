@@ -2780,6 +2780,157 @@ _ts_decorate$6([
     return True
 
 
+SHARE_IS_EMPTY_MARKER = "/* u-manager-companion: share-is-empty */"
+# Legacy marker from the first iteration of this patch — when it also
+# exposed a `companionInfo` resolver for client-side companion
+# detection. The client now uses the upstream `installedUnraidPlugins`
+# query for detection, so the bundled resolver is dead code. We strip
+# the old block on every apply so installs that already received the
+# v1 patch migrate cleanly.
+SHARE_IS_EMPTY_LEGACY_MARKER = (
+    "/* u-manager-companion: companion-info + share-is-empty */"
+)
+
+def patch_share_is_empty_bundle() -> bool:
+    """Expose `shareIsEmpty(name: String!): Boolean!` so the U-Manager
+    share editor can decide whether to surface the Delete button.
+
+    emhttpd refuses to remove a non-empty share, and turning that into
+    a button-press error is poor UX. We mirror the legacy web UI's
+    `ShareList.php?scan=<name>` algorithm (RecursiveDirectoryIterator,
+    skip `.DS_Store`, stop at the first real file) in a Node helper
+    attached to `SharesResolver.prototype`.
+
+    The TS counterpart lives in
+    `unraid-api/api/src/unraid-api/graph/shares/shares.resolver.ts`
+    (`shareIsEmpty`) on the `fix/share-mutations` branch and is the
+    canonical source for the upstream PR.
+
+    Attached to `SharesResolver` rather than a new `@Resolver` class
+    because adding one at runtime would also require injecting NestJS
+    module wiring — much more invasive. NestJS merges every resolver's
+    queries into a single root, so the client sees it at
+    `query.shareIsEmpty` regardless of host.
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("share-is-empty patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+
+    # ── Legacy cleanup ───────────────────────────────────────────────
+    # If the bundle already has the v1 marker, snip the entire old
+    # block out before doing anything else. The block always ends with
+    # the shareIsEmpty `_ts_decorate$6(...)` closing call — anchor on
+    # that line so the regex stays specific.
+    if SHARE_IS_EMPTY_LEGACY_MARKER in content:
+        legacy_pattern = re.compile(
+            re.escape(SHARE_IS_EMPTY_LEGACY_MARKER)
+            + r".*?\], SharesResolver\.prototype, \"shareIsEmpty\", null\);\n?",
+            re.DOTALL,
+        )
+        new_content, removed = legacy_pattern.subn("", content, count=1)
+        if removed:
+            content = new_content
+            log("share-is-empty patch: removed legacy companion-info block")
+
+    if SHARE_IS_EMPTY_MARKER in content:
+        # Need to write back even if the new marker is already there:
+        # the legacy cleanup may have modified `content`.
+        with open(bundle, "w") as f:
+            f.write(content)
+        return False
+
+    # Anchor at the end of the share-security patch: every patch_*
+    # function so far appends straight onto SharesResolver, so we tail
+    # the last decoration we added — `updateShareAccess` — and inject
+    # right after its closing `_ts_decorate$6(...)`. If that anchor is
+    # missing it means the share-security patch hasn't run yet and we
+    # bail; main() runs patches in a fixed order so the dependency is
+    # implicit.
+    anchor = '], SharesResolver.prototype, "updateShareAccess", null);'
+    if anchor not in content:
+        log("share-is-empty patch: updateShareAccess anchor not found")
+        return False
+
+    overlay = "\n" + SHARE_IS_EMPTY_MARKER + "\n" + r"""
+function _ts_param$shareIsEmpty(paramIndex, decorator) {
+    return function(target, key) { decorator(target, key, paramIndex); };
+}
+;(() => {
+    const proto = SharesResolver.prototype;
+    const fsPromiseModulePromise = import('node:fs/promises');
+    const pathModulePromise = import('node:path');
+
+    /**
+     * Walk `/mnt/user/<name>` recursively and return true when nothing
+     * user-visible lives inside.
+     *
+     * Directories on their own don't count, `.DS_Store` is ignored
+     * (macOS dumps these on every SMB share), symlinks are followed,
+     * and the iteration stops on the first real file — so populated
+     * shares are detected in O(1) and only empty shares pay the full
+     * traversal cost. Any IO error resolves to `true` so the caller
+     * never blocks the Delete button on a transient FS issue.
+     */
+    async function scanEmpty(directory) {
+        const { readdir, stat } = await fsPromiseModulePromise;
+        const { join } = await pathModulePromise;
+        let entries;
+        try {
+            entries = await readdir(directory, { withFileTypes: true });
+        } catch (e) {
+            return true;
+        }
+        for (const entry of entries) {
+            const entryPath = join(directory, entry.name);
+            let isDir = entry.isDirectory();
+            let isFile = entry.isFile();
+            if (entry.isSymbolicLink()) {
+                try {
+                    const s = await stat(entryPath);
+                    isDir = s.isDirectory();
+                    isFile = s.isFile();
+                } catch (e) { continue; }
+            }
+            if (isFile && entry.name !== '.DS_Store') return false;
+            if (isDir) {
+                const childEmpty = await scanEmpty(entryPath);
+                if (!childEmpty) return false;
+            }
+        }
+        return true;
+    }
+
+    proto.shareIsEmpty = async function patchedShareIsEmpty(name) {
+        if (!name || typeof name !== 'string') return true;
+        return scanEmpty('/mnt/user/' + name);
+    };
+})();
+_ts_decorate$6([
+    Query(()=>Boolean, {
+        description: 'Returns true when /mnt/user/<name> contains no user-visible files. Mirrors the legacy ShareList.php?scan=<name> handler.'
+    }),
+    UsePermissions({
+        action: AuthAction.READ_ANY,
+        resource: Resource.SHARE
+    }),
+    _ts_param$shareIsEmpty(0, Args('name', { type: ()=>String })),
+    _ts_metadata$4("design:type", Function),
+    _ts_metadata$4("design:paramtypes", [String]),
+    _ts_metadata$4("design:returntype", Promise)
+], SharesResolver.prototype, "shareIsEmpty", null);
+"""
+
+    insert_at = content.index(anchor) + len(anchor)
+    content = content[:insert_at] + overlay + content[insert_at:]
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"patched shareIsEmpty in {os.path.basename(bundle)}")
+    return True
+
+
 def main() -> int:
     changed_pubsub = patch_pubsub()
     changed_bundle = patch_bundle()
@@ -2798,6 +2949,7 @@ def main() -> int:
     changed_shares_parser = patch_shares_parser_use_cache_bundle()
     changed_array_disk_share_enabled = patch_array_disk_share_enabled_bundle()
     changed_slots_parser = patch_slots_parser_share_enabled_bundle()
+    changed_share_is_empty = patch_share_is_empty_bundle()
     if any([
         changed_pubsub,
         changed_bundle,
@@ -2816,6 +2968,7 @@ def main() -> int:
         changed_shares_parser,
         changed_array_disk_share_enabled,
         changed_slots_parser,
+        changed_share_is_empty,
     ]):
         restart_api()
         log("patches applied — unraid-api will restart")
