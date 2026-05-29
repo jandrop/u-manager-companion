@@ -252,7 +252,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>b4e4831d0592a4f78d54bd718136b43cfff2f5d5861274eaf9c9cd099a91b39c</SHA256>
+<SHA256>0ba5cd94267a32497653b11d8ed54bc1b63cb9c5e0153aab61547c4fdccf2469</SHA256>
 </FILE>
 
 <!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
