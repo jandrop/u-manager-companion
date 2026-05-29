@@ -2,3 +2,4 @@
 ._*
 *.pyc
 __pycache__/
+dist/
