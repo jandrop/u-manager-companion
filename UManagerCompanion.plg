@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.29.4">
+<!ENTITY version "2026.05.30.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -15,6 +15,12 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.30.1
+- The app can now tell when the array is starting up or stopping
+  (mounting/unmounting its disks), instead of jumping straight to
+  "Started". The current array filesystem state is now exposed to the
+  app.
+
 ###2026.05.29.4
 - Fixed the array getting stuck on the wrong state in the app. After
   stopping or starting the array, the app could keep showing the old
