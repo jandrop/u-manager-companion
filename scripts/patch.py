@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from companion._runtime import log, restart_api
 from companion.patches import (
+    array_state,
     disks,
     docker,
     network,
@@ -30,6 +31,7 @@ from companion.patches import (
     plugins,
     power,
     shares,
+    unassigned_devices,
 )
 
 
@@ -42,6 +44,8 @@ def main() -> int:
         plugins.apply(),
         shares.apply(),
         disks.apply(),
+        unassigned_devices.apply(),
+        array_state.apply(),
     ]
     if any(results):
         restart_api()
