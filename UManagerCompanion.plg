@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.29.3">
+<!ENTITY version "2026.05.29.4">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -15,6 +15,12 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.29.4
+- Fixed the array getting stuck on the wrong state in the app. After
+  stopping or starting the array, the app could keep showing the old
+  state and refuse to start or stop it. The live array state is now
+  read correctly, so starting and stopping the array works reliably.
+
 ###2026.05.29.3
 - Fix the install silently doing nothing on Unraid servers that
   don't have python3 available. Unraid 7.x base squashfs doesn't
