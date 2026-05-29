@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.29.2">
+<!ENTITY version "2026.05.29.3">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -15,6 +15,16 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.29.3
+- Fix the install silently doing nothing on Unraid servers that
+  don't have python3 available. Unraid 7.x base squashfs doesn't
+  include python3 unless a plugin like NerdTools or cache-mover
+  drags it in, so installs on otherwise-stock systems would print
+  `python3: command not found` and leave the API un-patched. The
+  companion now detects this, downloads a pinned Slackware python
+  package to /boot/extra/ (so it persists across reboots) and
+  installs it before applying the patches.
+
 ###2026.05.29.2
 - Internal refactor only: no user-visible changes. Patch script
   is now distributed as a versioned tarball published with each
@@ -242,7 +252,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>569c98c86153e93be315c0ca435652bbef2be2fdcb1c9f946bd9e38710d5de22</SHA256>
+<SHA256>b4e4831d0592a4f78d54bd718136b43cfff2f5d5861274eaf9c9cd099a91b39c</SHA256>
 </FILE>
 
 <!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
