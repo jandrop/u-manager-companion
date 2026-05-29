@@ -2,7 +2,7 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.30.1">
+<!ENTITY version "2026.05.30.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
@@ -15,6 +15,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.05.30.2
+- The app can now check for plugin updates on its own (pull to refresh on
+  the Plugins screen), so newer plugin versions show up without having to
+  open the Unraid web UI first.
+
 ###2026.05.30.1
 - The app can now tell when the array is starting up or stopping
   (mounting/unmounting its disks), instead of jumping straight to
