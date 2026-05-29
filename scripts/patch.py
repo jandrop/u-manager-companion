@@ -30,6 +30,7 @@ from companion.patches import (
     plugins,
     power,
     shares,
+    unassigned_devices,
 )
 
 
@@ -42,6 +43,7 @@ def main() -> int:
         plugins.apply(),
         shares.apply(),
         disks.apply(),
+        unassigned_devices.apply(),
     ]
     if any(results):
         restart_api()
