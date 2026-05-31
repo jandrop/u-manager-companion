@@ -2,19 +2,22 @@
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.31.1">
+<!ENTITY version "2026.05.31.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
-<!ENTITY icon "https://raw.githubusercontent.com/&github;/main/assets/icon.png">
+<!ENTITY icon "https://raw.githubusercontent.com/&github;/main/assets/icon.png?v=&version;">
 <!ENTITY tarball "&plgdir;/source.tar.gz">
 <!ENTITY tarballURL "https://github.com/&github;/releases/download/&version;/companion-&version;.tar.gz">
 ]>
 
-<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&icon;" min="6.11.0" support="https://github.com/&github;/issues">
+<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&name;.png" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
 <![CDATA[
+###2026.05.31.2
+- Use the U-Manager logo as the plugin icon and fix the icon on the Unraid Plugins page.
+
 ###2026.05.30.2
 - The app can now check for plugin updates on its own (pull to refresh on
   the Plugins screen), so newer plugin versions show up without having to
@@ -250,7 +253,7 @@
 <!-- Plugin icon shown in the Unraid Plugins page. Unraid looks for
      /usr/local/emhttp/plugins/<name>/<name>.png automatically. -->
 <FILE Name="/usr/local/emhttp/plugins/&name;/&name;.png">
-<URL>https://raw.githubusercontent.com/&github;/main/assets/icon.png</URL>
+<URL>&icon;</URL>
 </FILE>
 
 <!-- Plugin description shown in the Plugins page. Unraid renders the
