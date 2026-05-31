@@ -1,36 +1,56 @@
-name: Build and publish companion tarball
+name: Release
 
-# Fires when a version-shaped tag is pushed. Tag format follows the
-# Unraid plugin convention: YYYY.MM.DD[.N] — e.g. `2026.05.29.2`.
+# Fires on Unraid-style version tags: YYYY.MM.DD[.N], e.g. 2026.05.31.1.
 on:
   push:
     tags:
       - '2[0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]*'
 
 permissions:
-  contents: write   # required to create a release and upload the asset
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Checkout source (full history so we can push back)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Build deterministic tarball
         run: bash scripts/build.sh "${GITHUB_REF_NAME}"
 
-      - name: Verify .plg SHA256 matches the freshly-built tarball
+      - name: Inject the tarball SHA256 into UManagerCompanion.plg
+        id: sha
         run: |
-          TARBALL_SHA=$(sha256sum "dist/companion-${GITHUB_REF_NAME}.tar.gz" | cut -d' ' -f1)
-          PLG_SHA=$(grep -oE '<SHA256>[a-f0-9]{64}</SHA256>' UManagerCompanion.plg \
-                    | head -1 | sed -E 's|</?SHA256>||g')
-          echo "Tarball SHA256: $TARBALL_SHA"
-          echo ".plg SHA256:    $PLG_SHA"
-          if [ "$TARBALL_SHA" != "$PLG_SHA" ]; then
-            echo "::error::SHA mismatch — bump scripts/build.sh locally, update UManagerCompanion.plg, re-tag."
-            exit 1
+          TARBALL="dist/companion-${GITHUB_REF_NAME}.tar.gz"
+          SHA=$(sha256sum "$TARBALL" | cut -d' ' -f1)
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          sed -i -E "s|<SHA256>[^<]+</SHA256>|<SHA256>${SHA}</SHA256>|" UManagerCompanion.plg
+          echo "Tarball: $TARBALL"
+          echo "SHA256:  $SHA"
+          grep -E '<SHA256>' UManagerCompanion.plg
+
+      - name: Commit the updated .plg back to main
+        # Existing installations check the .plg at raw.githubusercontent.com/.../main,
+        # so the SHA in that file must match every published tarball. Doing it from
+        # CI keeps the source repo SHA-clean (placeholder) and removes the manual
+        # bump-and-tag-twice dance. The push targets main directly and does not
+        # retrigger this workflow because it only listens on tag pushes.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "Jandro"
+          git config user.email "alejandroplatasmallo@gmail.com"
+          if git diff --quiet -- UManagerCompanion.plg; then
+            echo "No SHA change to commit (already up to date)"
+            exit 0
           fi
+          git add UManagerCompanion.plg
+          git commit -m "release: ${GITHUB_REF_NAME} (.plg SHA from CI)"
+          git push origin HEAD:main
 
       - name: Publish GitHub release with the tarball
         uses: softprops/action-gh-release@v2
