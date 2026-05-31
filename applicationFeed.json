@@ -1,7 +1,7 @@
 {
-  "apps": 2,
-  "last_updated_timestamp": 1778955967,
-  "last_updated": "2026-05-16 19:46",
+  "apps": 3,
+  "last_updated_timestamp": 1780252716,
+  "last_updated": "2026-05-31 18:38",
   "categories": [
     {
       "Cat": "Tools-Utilities:",
@@ -58,6 +58,30 @@
       "downloads": 0,
       "FirstSeen": 1778955967,
       "LastUpdateScan": 1778955967,
+      "trending": 0,
+      "topPerforming": 0
+    },
+    {
+      "Plugin": true,
+      "Name": "Plex Ripper Detector",
+      "PluginURL": "https://raw.githubusercontent.com/jandrop/plex-ripper-detector/main/plugin/plex-ripper-detector.plg",
+      "PluginAuthor": "jandrop",
+      "Author": "jandrop",
+      "Icon": "https://raw.githubusercontent.com/jandrop/plex-ripper-detector/main/plugin/payload/usr/local/emhttp/plugins/plex-ripper-detector/plex-ripper-detector.png",
+      "Overview": "Detects unauthorized ripping of a self-hosted Plex Media Server by tools like Reaparr and PlexRipper. Six independent signals derived from Reaparr's source: User-Agent, 403-then-download probe, parallel Range requests, downloads without /:/timeline, daemon file descriptors with no matching session, and generic HTTP-client UAs on /library/parts. Runs every minute and exposes a WebGUI tab under Tools > System Information with a live dashboard, plus Telegram and Discord alerts.",
+      "Support": "https://github.com/jandrop/plex-ripper-detector/issues",
+      "Project": "https://github.com/jandrop/plex-ripper-detector",
+      "Repo": "U-Manager",
+      "CategoryList": [
+        "Tools-Utilities",
+        "Plugins"
+      ],
+      "Repository": "https://raw.githubusercontent.com/jandrop/plex-ripper-detector/main/plugin/plex-ripper-detector.plg",
+      "pluginVersion": "2026.05.31",
+      "ChangeLogPresent": "1",
+      "downloads": 0,
+      "FirstSeen": 1780252716,
+      "LastUpdateScan": 1780252716,
       "trending": 0,
       "topPerforming": 0
     }
