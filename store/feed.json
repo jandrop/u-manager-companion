@@ -33,7 +33,7 @@
       "PluginURL": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/UManagerCompanion.plg",
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
-      "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/assets/icon.png",
+      "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/assets/icon.png?v=2026.05.31.2",
       "Overview": "Monkey-patches Unraid's bundled GraphQL API at boot to expose extra data and write paths the U-Manager mobile app needs — installed-plugin manifest metadata, network device utilisation, Docker stats, parity-check resume, power mutations, share CRUD (create/edit/delete) and more. Required on the Unraid server for the app to show the full picture.",
       "Support": "https://github.com/jandrop/u-manager-companion/issues",
       "Project": "https://github.com/jandrop/u-manager-companion",
