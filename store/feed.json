@@ -60,7 +60,7 @@
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
       "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-files-releases/main/assets/icon.png",
-      "Overview": "Native file browser for Unraid. Browse, upload, download, search, archives, hardlinks, trash, permissions, image and video thumbnails. Powers the file browsing feature in the U-Manager mobile app and runs standalone in any browser at port 8740.",
+      "Overview": "Official U-Manager API for Unraid, plus a built-in file explorer. Successor to FileManagerApi and FileManagerUI. Browse, upload, download, search, archives, hardlinks, trash, permissions, image and video thumbnails. Powers the file browsing feature in the U-Manager mobile app and runs standalone in any browser at port 8740.",
       "Support": "https://github.com/jandrop/u-manager-files-releases/issues",
       "Project": "https://github.com/jandrop/u-manager-files-releases",
       "Repo": "U-Manager Files",
