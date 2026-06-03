@@ -1,17 +1,18 @@
 <?xml version="1.0" standalone="yes"?>
 <!DOCTYPE PLUGIN [
 <!ENTITY name "u-manager-companion">
+<!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
 <!ENTITY version "2026.05.31.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
-<!ENTITY pluginURL "https://raw.githubusercontent.com/&github;/main/UManagerCompanion.plg">
+<!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
 <!ENTITY icon "https://raw.githubusercontent.com/&github;/main/assets/icon.png?v=&version;">
 <!ENTITY tarball "&plgdir;/source.tar.gz">
 <!ENTITY tarballURL "https://github.com/&github;/releases/download/&version;/companion-&version;.tar.gz">
 ]>
 
-<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&name;.png" min="6.11.0" support="https://github.com/&github;/issues">
+<PLUGIN name="&displayName;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&name;.png" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
 <![CDATA[
@@ -260,7 +261,7 @@
      contents of /usr/local/emhttp/plugins/<name>/README.md as Markdown. -->
 <FILE Name="/usr/local/emhttp/plugins/&name;/README.md">
 <INLINE>
-**&name;**
+**&displayName;**
 
 Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mobile app needs.
 </INLINE>
@@ -288,14 +289,14 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <INLINE>
 echo ""
 echo "--------------------------------------------"
-echo " Installing &name; v&version;"
+echo " Installing &displayName; v&version;"
 echo "--------------------------------------------"
 echo ""
 tar --no-same-owner -xzf &tarball; -C &plgdir;
 rm -f &tarball;
 bash &plgdir;/apply.sh
 echo ""
-echo " &name; installed."
+echo " &displayName; installed."
 echo "--------------------------------------------"
 echo ""
 </INLINE>
@@ -311,7 +312,7 @@ rm -rf &plgdir;
 rm -rf /usr/local/emhttp/plugins/&name;
 echo ""
 echo "--------------------------------------------"
-echo " &name; removed."
+echo " &displayName; removed."
 echo " Reboot Unraid to revert the API patches."
 echo "--------------------------------------------"
 echo ""
