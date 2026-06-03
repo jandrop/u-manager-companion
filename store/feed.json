@@ -3,22 +3,22 @@
   "applist": [
     {
       "Plugin": true,
-      "Name": "UManager",
-      "PluginURL": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/UManager.plg",
+      "Name": "U-Manager Push Notifications",
+      "PluginURL": "https://github.com/jandrop/u-manager-unraid-plugin/releases/latest/download/UManager.plg",
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
       "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-unraid-plugin/main/plugins/dynamix/icons/umanager.png?v=2026.05.31.3",
       "Overview": "Push notification agent for the U-Manager mobile app. Forwards Unraid notifications to your phone so you don't have to keep the web UI open.",
       "Support": "https://github.com/jandrop/u-manager-unraid-plugin/issues",
       "Project": "https://github.com/jandrop/u-manager-unraid-plugin",
-      "Repo": "U-Manager",
-      "RepoShort": "u-manager",
+      "Repo": "U-Manager Push Notifications",
+      "RepoShort": "u-manager-push-notifications",
       "MinVer": "6.11.0",
       "CategoryList": [
         "Tools-Utilities",
         "Network-Other"
       ],
-      "Date": "2026-05-31",
+      "Date": "2026-06-03",
       "License": "MIT",
       "RecommendedWho": "U-Manager",
       "RecommendedDate": 1747785600,
@@ -30,7 +30,7 @@
     {
       "Plugin": true,
       "Name": "U-Manager Companion",
-      "PluginURL": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/UManagerCompanion.plg",
+      "PluginURL": "https://github.com/jandrop/u-manager-companion/releases/latest/download/UManagerCompanion.plg",
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
       "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/assets/icon.png?v=2026.05.31.2",
@@ -70,7 +70,7 @@
         "Tools-Utilities",
         "Productivity"
       ],
-      "Date": "2026-05-31",
+      "Date": "2026-06-03",
       "License": "MIT",
       "RecommendedWho": "U-Manager",
       "RecommendedDate": 1747785600,
@@ -82,7 +82,7 @@
     {
       "Plugin": true,
       "Name": "Plex Ripper Detector",
-      "PluginURL": "https://raw.githubusercontent.com/jandrop/plex-ripper-detector/main/plugin/plex-ripper-detector.plg",
+      "PluginURL": "https://github.com/jandrop/plex-ripper-detector/releases/latest/download/plex-ripper-detector.plg",
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
       "Icon": "https://raw.githubusercontent.com/jandrop/plex-ripper-detector/main/plugin/payload/usr/local/emhttp/plugins/plex-ripper-detector/plex-ripper-detector.png",
@@ -96,7 +96,7 @@
         "Tools-Utilities",
         "Productivity"
       ],
-      "Date": "2026-05-31",
+      "Date": "2026-06-03",
       "License": "MIT",
       "RecommendedWho": "jandrop",
       "RecommendedDate": 1748736000,
