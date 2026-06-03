@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.05.31.2">
+<!ENTITY version "2026.06.03.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.06.03.1
+- The Unraid Plugins page now shows the plugin as "U-Manager Companion"
+  instead of the internal id. No behaviour changes — same patches,
+  same install paths.
+
 ###2026.05.31.2
 - Use the U-Manager logo as the plugin icon and fix the icon on the Unraid Plugins page.
 
