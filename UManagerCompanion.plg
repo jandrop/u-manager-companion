@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.06.03.1">
+<!ENTITY version "2026.06.03.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -12,10 +12,18 @@
 <!ENTITY tarballURL "https://github.com/&github;/releases/download/&version;/companion-&version;.tar.gz">
 ]>
 
-<PLUGIN name="&displayName;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&name;.png" min="6.11.0" support="https://github.com/&github;/issues">
+<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" icon="&name;.png" min="6.11.0" support="https://github.com/&github;/issues">
 
 <CHANGES>
 <![CDATA[
+###2026.06.03.2
+- Fix the plugin icon and description not showing in the Unraid
+  Plugins page after a fresh install on top of 2026.06.03.1. The
+  previous release tried to set a human row title at the wrong place
+  in the manifest, which broke the on-disk path the Plugins page
+  uses to load the icon and the description from. The human name
+  ("U-Manager Companion") now comes from the README header instead.
+
 ###2026.06.03.1
 - The Unraid Plugins page now shows the plugin as "U-Manager Companion"
   instead of the internal id. No behaviour changes — same patches,
