@@ -52,11 +52,19 @@ jobs:
           git commit -m "release: ${GITHUB_REF_NAME} (.plg SHA from CI)"
           git push origin HEAD:main
 
-      - name: Publish GitHub release with the tarball
+      - name: Publish GitHub release with the tarball and .plg
+        # The .plg is uploaded alongside the tarball so download counts
+        # from GitHub's Releases API track real installs — raw.github
+        # fetches of the .plg on main are invisible to the API. The
+        # side feed in u-manager-companion/store/feed.json points the
+        # CA Store at `releases/latest/download/UManagerCompanion.plg`,
+        # which resolves to this asset.
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          files: dist/companion-${{ github.ref_name }}.tar.gz
+          files: |
+            dist/companion-${{ github.ref_name }}.tar.gz
+            UManagerCompanion.plg
           generate_release_notes: false
           fail_on_unmatched_files: true
