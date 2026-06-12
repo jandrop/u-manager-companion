@@ -78,32 +78,6 @@
         "en_US": "Install on your Unraid server to use the file browser from the U-Manager mobile app. Also serves a standalone web UI on port 8740.",
         "es_ES": "Instálalo en el servidor para usar el explorador de archivos desde la app U-Manager. También expone una interfaz web independiente en el puerto 8740."
       }
-    },
-    {
-      "Plugin": true,
-      "Name": "Plex Ripper Detector",
-      "PluginURL": "https://github.com/jandrop/plex-ripper-detector/releases/latest/download/plex-ripper-detector.plg",
-      "PluginAuthor": "jandrop",
-      "Author": "jandrop",
-      "Icon": "https://raw.githubusercontent.com/jandrop/plex-ripper-detector/main/plugin/payload/usr/local/emhttp/plugins/plex-ripper-detector/plex-ripper-detector.png",
-      "Overview": "Detects unauthorized ripping of a self-hosted Plex Media Server by tools like Reaparr and PlexRipper. Six independent signals derived from Reaparr's source: User-Agent, 403-then-download probe, parallel Range requests, downloads without /:/timeline, daemon file descriptors with no matching session, and generic HTTP-client UAs on /library/parts. Runs every minute and exposes a WebGUI tab under Tools > System Information with a live dashboard, plus Telegram and Discord alerts.",
-      "Support": "https://github.com/jandrop/plex-ripper-detector/issues",
-      "Project": "https://github.com/jandrop/plex-ripper-detector",
-      "Repo": "Plex Ripper Detector",
-      "RepoShort": "plex-ripper-detector",
-      "MinVer": "6.11.0",
-      "CategoryList": [
-        "Tools-Utilities",
-        "Productivity"
-      ],
-      "Date": "2026-06-03",
-      "License": "MIT",
-      "RecommendedWho": "jandrop",
-      "RecommendedDate": 1748736000,
-      "RecommendedReason": {
-        "en_US": "Catches Reaparr and PlexRipper hitting your server. Six detection signals derived from the ripper source code. Web dashboard, Telegram and Discord alerts. No port forwarding required.",
-        "es_ES": "Detecta herramientas tipo Reaparr o PlexRipper que se descargan tus videos. Seis senales de deteccion basadas en el codigo fuente del ripper. Dashboard web y alertas Telegram y Discord. No requiere abrir puertos."
-      }
     }
   ]
 }
