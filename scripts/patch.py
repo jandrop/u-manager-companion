@@ -27,6 +27,8 @@ from companion.patches import (
     array_state,
     disks,
     docker,
+    docker_template_create,
+    docker_template_delete,
     network,
     parity,
     plugin_check,
@@ -50,6 +52,8 @@ def main() -> int:
         unassigned_devices.apply(),
         array_state.apply(),
         array_fsstate.apply(),
+        docker_template_create.apply(),
+        docker_template_delete.apply(),
     ]
     if any(results):
         restart_api()
