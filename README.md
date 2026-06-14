@@ -225,23 +225,7 @@ query {
 
 ---
 
-### 4. `parityCheck.resume` continues instead of restarting
-
-- **Type:** bug fix
-- **Upstream tracking:** [unraid/api#1815](https://github.com/unraid/api/issues/1815)
-- **Why U-Manager needs it:** the app exposes pause/resume controls for parity checks (a check on a multi-disk array can take ~20 hours). Without this patch the resume mutation silently throws away the saved position — clicking resume after a pause restarts from byte 0, undoing all the work the check had already done.
-
-Upstream's `ParityService.updateParityCheck()` POSTs `cmdCheck=Resume` to emhttpd, but emhttpd identifies which action to run by the field NAME, not its value (the Unraid web UI submits dynamic field names like `cmdCheckPause`/`cmdCheckResume`/`cmdCheckCancel` with empty values — see `/usr/local/emhttp/plugins/dynamix/ArrayOperation.page`). With `cmdCheck=Resume`, emhttpd falls through to the plain `cmdCheck` submit handler — which starts a fresh check — and the saved `mdResyncPos` is discarded. Pause and cancel happen to work via fallback handling, but resume is the broken one.
-
-The patch rewrites the action map to use the same field names the web UI submits. Verified live on Unraid 7.3.0:
-
-| Stage | `mdResyncPos` |
-|---|---|
-| Before pause | 521 044 |
-| After pause  | 1 655 644 (saved) |
-| After resume | 2 395 484 (continued growing) |
-
-### 5. Share CRUD mutations — `createShare`, `updateShare`, `deleteShare`
+### 4. Share CRUD mutations — `createShare`, `updateShare`, `deleteShare`
 
 - **Type:** missing feature
 - **Upstream tracking:** the official `SharesResolver` ships only a read-only `shares` query. There's a stub at `api/src/core/modules/add-share.ts` that literally throws `NotImplementedError` and isn't wired into the schema. PR pending on the unraid-api fork.
@@ -282,9 +266,6 @@ don't break anything:
 - The **Docker logs stderr** patch uses the patched substring itself
   as its marker (`{ all } = await execa('docker'`) — re-running on an
   already-patched bundle is a no-op.
-- The **parity resume** patch uses the patched action map as its
-  marker (`cmdCheckResume: ''`), so re-applying is a no-op once the
-  fix is in place.
 - The bundle filename is resolved dynamically (`plugin.module-*.js`)
   so each `unraid-api` release that changes the bundle hash is
   picked up automatically.
