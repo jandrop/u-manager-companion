@@ -32,7 +32,6 @@ from companion.patches import (
     docker_template_delete,
     docker_update_stream,
     network,
-    parity,
     plugin_check,
     plugins,
     power,
@@ -45,7 +44,6 @@ def main() -> int:
     results = [
         network.apply(),
         docker.apply(),
-        parity.apply(),
         power.apply(),
         plugins.apply(),
         plugin_check.apply(),
