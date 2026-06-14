@@ -34,7 +34,7 @@
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
       "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/assets/icon.png?v=2026.05.31.2",
-      "Overview": "Monkey-patches Unraid's bundled GraphQL API at boot to expose extra data and write paths the U-Manager mobile app needs — installed-plugin manifest metadata, network device utilisation, Docker stats, parity-check resume, power mutations, share CRUD (create/edit/delete) and more. Required on the Unraid server for the app to show the full picture.",
+      "Overview": "Companion plugin for the U-Manager mobile app. Fixes bugs in the Unraid API and enables newer U-Manager features.",
       "Support": "https://github.com/jandrop/u-manager-companion/issues",
       "Project": "https://github.com/jandrop/u-manager-companion",
       "Repo": "U-Manager Companion",
@@ -50,8 +50,8 @@
       "RecommendedWho": "U-Manager",
       "RecommendedDate": 1747785600,
       "RecommendedReason": {
-        "en_US": "Required on the Unraid server for U-Manager to access plugin manifests, network metrics and Docker stats over GraphQL.",
-        "es_ES": "Requerido en el servidor para que U-Manager acceda a los manifests de plugins, métricas de red y stats de Docker vía GraphQL."
+        "en_US": "Required on the Unraid server to unlock the full U-Manager experience.",
+        "es_ES": "Requerido en el servidor para desbloquear la experiencia completa de U-Manager."
       }
     },
     {
