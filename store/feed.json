@@ -40,6 +40,7 @@
       "Repo": "U-Manager Companion",
       "RepoShort": "u-manager-companion",
       "MinVer": "6.11.0",
+      "Requires": "Unraid Connect (latest version)",
       "CategoryList": [
         "Tools-Utilities",
         "Productivity"
