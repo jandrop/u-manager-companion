@@ -34,12 +34,13 @@
       "PluginAuthor": "jandrop",
       "Author": "jandrop",
       "Icon": "https://raw.githubusercontent.com/jandrop/u-manager-companion/main/assets/icon.png?v=2026.05.31.2",
-      "Overview": "Monkey-patches Unraid's bundled GraphQL API at boot to expose extra data and write paths the U-Manager mobile app needs — installed-plugin manifest metadata, network device utilisation, Docker stats, parity-check resume, power mutations, share CRUD (create/edit/delete) and more. Required on the Unraid server for the app to show the full picture.",
+      "Overview": "Companion plugin for the U-Manager mobile app. Fixes bugs in the Unraid API and enables newer U-Manager features.",
       "Support": "https://github.com/jandrop/u-manager-companion/issues",
       "Project": "https://github.com/jandrop/u-manager-companion",
       "Repo": "U-Manager Companion",
       "RepoShort": "u-manager-companion",
       "MinVer": "6.11.0",
+      "Requires": "Unraid Connect (latest version)",
       "CategoryList": [
         "Tools-Utilities",
         "Productivity"
@@ -49,8 +50,8 @@
       "RecommendedWho": "U-Manager",
       "RecommendedDate": 1747785600,
       "RecommendedReason": {
-        "en_US": "Required on the Unraid server for U-Manager to access plugin manifests, network metrics and Docker stats over GraphQL.",
-        "es_ES": "Requerido en el servidor para que U-Manager acceda a los manifests de plugins, métricas de red y stats de Docker vía GraphQL."
+        "en_US": "Required on the Unraid server to unlock the full U-Manager experience.",
+        "es_ES": "Requerido en el servidor para desbloquear la experiencia completa de U-Manager."
       }
     },
     {
@@ -77,32 +78,6 @@
       "RecommendedReason": {
         "en_US": "Install on your Unraid server to use the file browser from the U-Manager mobile app. Also serves a standalone web UI on port 8740.",
         "es_ES": "Instálalo en el servidor para usar el explorador de archivos desde la app U-Manager. También expone una interfaz web independiente en el puerto 8740."
-      }
-    },
-    {
-      "Plugin": true,
-      "Name": "Plex Ripper Detector",
-      "PluginURL": "https://github.com/jandrop/plex-ripper-detector/releases/latest/download/plex-ripper-detector.plg",
-      "PluginAuthor": "jandrop",
-      "Author": "jandrop",
-      "Icon": "https://raw.githubusercontent.com/jandrop/plex-ripper-detector/main/plugin/payload/usr/local/emhttp/plugins/plex-ripper-detector/plex-ripper-detector.png",
-      "Overview": "Detects unauthorized ripping of a self-hosted Plex Media Server by tools like Reaparr and PlexRipper. Six independent signals derived from Reaparr's source: User-Agent, 403-then-download probe, parallel Range requests, downloads without /:/timeline, daemon file descriptors with no matching session, and generic HTTP-client UAs on /library/parts. Runs every minute and exposes a WebGUI tab under Tools > System Information with a live dashboard, plus Telegram and Discord alerts.",
-      "Support": "https://github.com/jandrop/plex-ripper-detector/issues",
-      "Project": "https://github.com/jandrop/plex-ripper-detector",
-      "Repo": "Plex Ripper Detector",
-      "RepoShort": "plex-ripper-detector",
-      "MinVer": "6.11.0",
-      "CategoryList": [
-        "Tools-Utilities",
-        "Productivity"
-      ],
-      "Date": "2026-06-03",
-      "License": "MIT",
-      "RecommendedWho": "jandrop",
-      "RecommendedDate": 1748736000,
-      "RecommendedReason": {
-        "en_US": "Catches Reaparr and PlexRipper hitting your server. Six detection signals derived from the ripper source code. Web dashboard, Telegram and Discord alerts. No port forwarding required.",
-        "es_ES": "Detecta herramientas tipo Reaparr o PlexRipper que se descargan tus videos. Seis senales de deteccion basadas en el codigo fuente del ripper. Dashboard web y alertas Telegram y Discord. No requiere abrir puertos."
       }
     }
   ]

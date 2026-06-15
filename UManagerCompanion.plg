@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.06.03.2">
+<!ENTITY version "2026.06.16.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.06.16.1
+- Removed the parity check resume patch. Unraid Connect now ships the
+  upstream fix, so the companion no longer needs to patch it locally.
+- General improvements for the U-Manager mobile app.
+
 ###2026.06.03.2
 - Fix the plugin icon and description not showing in the Unraid
   Plugins page after a fresh install on top of 2026.06.03.1. The
@@ -286,7 +291,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>a415ea1b532aaf2e6906acace309744c7570c4bc48ec15e1621f3f19524728c3</SHA256>
+<SHA256>84e2c0a69b6a140d841626e7d459ae03fffd16acc63978f69c833e6fd1a80696</SHA256>
 </FILE>
 
 <!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
