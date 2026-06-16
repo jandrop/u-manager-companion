@@ -1,8 +1,25 @@
-"""Network device data + per-interface metrics + pubsub channel.
+"""Network device data — InfoNetwork extras + DevicesService.generateNetwork().
 
-Three patches that together expose `info.devices.network[]`,
-`metrics.network[]` and the `systemMetricsNetwork` subscription that
-the stock unraid-api ships as stubs or omits entirely.
+`metrics.network` and the `systemMetricsNetwork` subscription used to
+require this patch too, but upstream ships both natively from Unraid
+API 4.35.0 onwards (with a different per-interface shape — see the
+`unraid_api` package CLAUDE.md). This patch focuses only on the two
+pieces still missing from upstream:
+
+* `DevicesService.generateNetwork()` returns `[]` in stock unraid-api.
+  We replace it with a real impl that reads `/sys/class/net` +
+  `/proc/net/dev` + `lspci -mm` so `info.devices.network` surfaces
+  every NIC/bond/bridge with vendor/model identity, the LAN IP
+  inherited from a user bridge, and per-interface traffic rates.
+
+* `InfoNetwork` upstream exposes only `iface/model/vendor/mac/virtual/
+  speed/dhcp`. We extend it with `status`, `ipAddress`, `type` and the
+  rx/tx counters so the app's network card has all the identity +
+  utilisation data in one round-trip.
+
+Anything resolver/subscription-side (`Metrics.network`,
+`MetricsResolver.network`, `systemMetricsNetwork`) is now native and
+no longer touched here.
 """
 from __future__ import annotations
 
@@ -10,63 +27,34 @@ import os
 import re
 
 from companion._bundle import (
-    BUNDLE_GLOB,
-    PUBSUB_FILE,
     find_bundle,
     find_decorator_suffix,
     find_metadata_suffix,
 )
 from companion._runtime import log
 
-PUBSUB_MARKER = "NETWORK_UTILIZATION"
-BUNDLE_MARKER = "class NetworkUtilization extends Node"
-
-def patch_pubsub() -> bool:
-    if not os.path.exists(PUBSUB_FILE):
-        log(f"pubsub enum file not found at {PUBSUB_FILE}")
-        return False
-    with open(PUBSUB_FILE, "r") as f:
-        content = f.read()
-    if PUBSUB_MARKER in content:
-        return False
-    anchor = 'GRAPHQL_PUBSUB_CHANNEL["MEMORY_UTILIZATION"] = "MEMORY_UTILIZATION";'
-    if anchor not in content:
-        log("pubsub anchor not found, skipping")
-        return False
-    content = content.replace(
-        anchor,
-        anchor + '\n    GRAPHQL_PUBSUB_CHANNEL["NETWORK_UTILIZATION"] = "NETWORK_UTILIZATION";',
-        1,
-    )
-    with open(PUBSUB_FILE, "w") as f:
-        f.write(content)
-    log("patched pubsub enum")
-    return True
+# `ipAddress` is added to `InfoNetwork` by this patch and never exists
+# in upstream, so the single-quoted form `'ipAddress'` emitted by our
+# `info_field` template is a safe idempotency check.
+BUNDLE_MARKER = "InfoNetwork.prototype, 'ipAddress', void 0)"
 
 
 def patch_bundle() -> bool:
     bundle = find_bundle()
     if not bundle:
-        log("no compatible bundle found")
+        log("network patch: no compatible bundle found")
         return False
     with open(bundle, "r") as f:
         content = f.read()
     if BUNDLE_MARKER in content:
         return False
 
-    # Extract decorator suffixes used by each target class.
     info_d = find_decorator_suffix(content, 'InfoNetwork.prototype, "dhcp", void 0)')
     info_m = find_metadata_suffix(content, 'InfoNetwork.prototype, "dhcp", void 0)')
-    metrics_d = find_decorator_suffix(content, 'Metrics.prototype, "memory", void 0)')
-    metrics_m = find_metadata_suffix(content, 'Metrics.prototype, "memory", void 0)')
-    resolver_d = find_decorator_suffix(content, 'MetricsResolver.prototype, "memory", null)')
-    resolver_m = find_metadata_suffix(content, 'MetricsResolver.prototype, "memory", null)')
-
-    if not all([info_d, info_m, metrics_d, metrics_m, resolver_d, resolver_m]):
+    if not info_d or not info_m:
         log(
-            f"could not extract all decorator suffixes "
-            f"(info={info_d}/{info_m} metrics={metrics_d}/{metrics_m} "
-            f"resolver={resolver_d}/{resolver_m})"
+            f"network patch: missing InfoNetwork decorator suffix "
+            f"(info={info_d}/{info_m})"
         )
         return False
 
@@ -304,256 +292,14 @@ def patch_bundle() -> bool:
         return False
     content = new_content
 
-    # ── 4. Add NetworkInterfaceUtilization + NetworkUtilization types + Metrics.network ──
-    new_types = (
-        "class NetworkInterfaceUtilization {\n"
-        "    iface;\n"
-        "    rxBytes;\n"
-        "    txBytes;\n"
-        "    rxBytesPerSec;\n"
-        "    txBytesPerSec;\n"
-        "}\n"
-        f"_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>String, {{ description: 'Interface name' }}),\n"
-        f"    _ts_metadata${metrics_m}('design:type', String)\n"
-        f"], NetworkInterfaceUtilization.prototype, 'iface', void 0);\n"
-        f"_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>Float, {{ description: 'Total bytes received' }}),\n"
-        f"    _ts_metadata${metrics_m}('design:type', Number)\n"
-        f"], NetworkInterfaceUtilization.prototype, 'rxBytes', void 0);\n"
-        f"_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>Float, {{ description: 'Total bytes transmitted' }}),\n"
-        f"    _ts_metadata${metrics_m}('design:type', Number)\n"
-        f"], NetworkInterfaceUtilization.prototype, 'txBytes', void 0);\n"
-        f"_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>Float, {{ description: 'Current receive speed (B/s)' }}),\n"
-        f"    _ts_metadata${metrics_m}('design:type', Number)\n"
-        f"], NetworkInterfaceUtilization.prototype, 'rxBytesPerSec', void 0);\n"
-        f"_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>Float, {{ description: 'Current transmit speed (B/s)' }}),\n"
-        f"    _ts_metadata${metrics_m}('design:type', Number)\n"
-        f"], NetworkInterfaceUtilization.prototype, 'txBytesPerSec', void 0);\n"
-        f"NetworkInterfaceUtilization = _ts_decorate${metrics_d}([\n"
-        f"    ObjectType({{ description: 'Network utilization for a single interface' }})\n"
-        f"], NetworkInterfaceUtilization);\n\n"
-        "class NetworkUtilization extends Node {\n"
-        "    interfaces;\n"
-        "}\n"
-        f"_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>[NetworkInterfaceUtilization], {{ description: 'Per-interface utilization' }}),\n"
-        f"    _ts_metadata${metrics_m}('design:type', Array)\n"
-        f"], NetworkUtilization.prototype, 'interfaces', void 0);\n"
-        f"NetworkUtilization = _ts_decorate${metrics_d}([\n"
-        f"    ObjectType({{ implements: ()=>Node, description: 'Snapshot of network utilization' }})\n"
-        f"], NetworkUtilization);\n\n"
-    )
-
-    old_metrics_class = "class Metrics extends Node {\n    cpu;\n    memory;\n    temperature;\n}"
-    new_metrics_class = (
-        new_types
-        + "class Metrics extends Node {\n    cpu;\n    memory;\n    network;\n    temperature;\n}"
-    )
-    if old_metrics_class not in content:
-        log("Metrics class body shape changed, aborting")
-        return False
-    content = content.replace(old_metrics_class, new_metrics_class, 1)
-
-    old_temp_dec = (
-        f"_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>TemperatureMetrics, {{\n"
-        f"        nullable: true,\n"
-        f"        description: 'Temperature metrics'\n"
-        f"    }}),\n"
-        f'    _ts_metadata${metrics_m}("design:type", typeof TemperatureMetrics === "undefined" ? Object : TemperatureMetrics)\n'
-        f'], Metrics.prototype, "temperature", void 0);'
-    )
-    new_temp_plus_network = old_temp_dec + (
-        f"\n_ts_decorate${metrics_d}([\n"
-        f"    Field(()=>NetworkUtilization, {{\n"
-        f"        description: 'Current network utilization metrics',\n"
-        f"        nullable: true\n"
-        f"    }}),\n"
-        f'    _ts_metadata${metrics_m}("design:type", typeof NetworkUtilization === "undefined" ? Object : NetworkUtilization)\n'
-        f'], Metrics.prototype, "network", void 0);'
-    )
-    if old_temp_dec not in content:
-        log("Metrics temperature decorator not found, aborting")
-        return False
-    content = content.replace(old_temp_dec, new_temp_plus_network, 1)
-
-    # ── 5. Modify MetricsResolver ────────────────────────────────────────
-    old_logger = "    logger = new Logger(MetricsResolver.name);"
-    new_logger = "    networkPreviousSnapshot = new Map();\n    logger = new Logger(MetricsResolver.name);"
-    if old_logger not in content:
-        log("MetricsResolver logger field not found, aborting")
-        return False
-    content = content.replace(old_logger, new_logger, 1)
-
-    old_memory_polling = (
-        "this.subscriptionTracker.registerTopic(GRAPHQL_PUBSUB_CHANNEL.MEMORY_UTILIZATION, async ()=>{\n"
-        "            const payload = await this.memoryService.generateMemoryLoad();\n"
-        "            pubsub.publish(GRAPHQL_PUBSUB_CHANNEL.MEMORY_UTILIZATION, {\n"
-        "                systemMetricsMemory: payload\n"
-        "            });\n"
-        "        }, 2000);"
-    )
-    network_polling = (
-        "this.subscriptionTracker.registerTopic('NETWORK_UTILIZATION', async ()=>{\n"
-        "            try {\n"
-        "                const { readFile, readdir } = await import('fs/promises');\n"
-        "                const raw = await readFile('/proc/net/dev', 'utf8').catch(() => '');\n"
-        "                const now = Date.now();\n"
-        "                const current = new Map();\n"
-        "                for (const line of raw.split('\\n').slice(2)) {\n"
-        "                    const m = line.trim().match(/^(\\S+):\\s+(\\d+)(?:\\s+\\d+){6}\\s+\\d+\\s+(\\d+)/);\n"
-        "                    if (m) current.set(m[1], { rxBytes: parseFloat(m[2]), txBytes: parseFloat(m[3]), timestamp: now });\n"
-        "                }\n"
-        "                const isReal = async (name) => {\n"
-        "                    if (name === 'lo') return true;\n"
-        "                    const entries = await readdir(`/sys/class/net/${name}`).catch(() => []);\n"
-        "                    return entries.includes('device') || entries.includes('bonding') || entries.includes('wireless');\n"
-        "                };\n"
-        "                const interfaces = [];\n"
-        "                for (const [iface, sample] of current.entries()) {\n"
-        "                    if (!await isReal(iface)) continue;\n"
-        "                    const previous = this.networkPreviousSnapshot.get(iface);\n"
-        "                    let rxBytesPerSec = 0;\n"
-        "                    let txBytesPerSec = 0;\n"
-        "                    if (previous) {\n"
-        "                        const deltaSeconds = (sample.timestamp - previous.timestamp) / 1000;\n"
-        "                        if (deltaSeconds > 0) {\n"
-        "                            rxBytesPerSec = Math.max(0, (sample.rxBytes - previous.rxBytes) / deltaSeconds);\n"
-        "                            txBytesPerSec = Math.max(0, (sample.txBytes - previous.txBytes) / deltaSeconds);\n"
-        "                        }\n"
-        "                    }\n"
-        "                    interfaces.push({ iface, rxBytes: sample.rxBytes, txBytes: sample.txBytes, rxBytesPerSec, txBytesPerSec });\n"
-        "                }\n"
-        "                this.networkPreviousSnapshot = current;\n"
-        "                pubsub.publish('NETWORK_UTILIZATION', {\n"
-        "                    systemMetricsNetwork: { id: 'metrics/network', interfaces }\n"
-        "                });\n"
-        "            } catch (err) {\n"
-        "                this.logger.warn('Failed to publish network metrics: ' + String(err));\n"
-        "            }\n"
-        "        }, 1000);"
-    )
-    if old_memory_polling not in content:
-        log("memory polling registration not found, aborting")
-        return False
-    content = content.replace(
-        old_memory_polling, old_memory_polling + "\n        " + network_polling, 1
-    )
-
-    old_memory_method = (
-        "    async memory() {\n"
-        "        return this.memoryService.generateMemoryLoad();\n"
-        "    }"
-    )
-    new_methods = old_memory_method + (
-        "\n"
-        "    async network() {\n"
-        "        try {\n"
-        "            const { readFile, readdir } = await import('fs/promises');\n"
-        "            const parseTraffic = (raw, now) => {\n"
-        "                const map = new Map();\n"
-        "                for (const line of raw.split('\\n').slice(2)) {\n"
-        "                    const m = line.trim().match(/^(\\S+):\\s+(\\d+)(?:\\s+\\d+){6}\\s+\\d+\\s+(\\d+)/);\n"
-        "                    if (m) map.set(m[1], { rxBytes: parseFloat(m[2]), txBytes: parseFloat(m[3]), timestamp: now });\n"
-        "                }\n"
-        "                return map;\n"
-        "            };\n"
-        "            const isReal = async (name) => {\n"
-        "                if (name === 'lo') return true;\n"
-        "                const entries = await readdir(`/sys/class/net/${name}`).catch(() => []);\n"
-        "                return entries.includes('device') || entries.includes('bonding') || entries.includes('wireless');\n"
-        "            };\n"
-        "            const raw1 = await readFile('/proc/net/dev', 'utf8').catch(() => '');\n"
-        "            const t1 = parseTraffic(raw1, Date.now());\n"
-        "            await new Promise((resolve) => setTimeout(resolve, 1000));\n"
-        "            const raw2 = await readFile('/proc/net/dev', 'utf8').catch(() => '');\n"
-        "            const t2 = parseTraffic(raw2, Date.now());\n"
-        "            const interfaces = [];\n"
-        "            for (const [iface, sample] of t2.entries()) {\n"
-        "                if (!await isReal(iface)) continue;\n"
-        "                const previous = t1.get(iface);\n"
-        "                let rxBytesPerSec = 0;\n"
-        "                let txBytesPerSec = 0;\n"
-        "                if (previous) {\n"
-        "                    const deltaSeconds = (sample.timestamp - previous.timestamp) / 1000;\n"
-        "                    if (deltaSeconds > 0) {\n"
-        "                        rxBytesPerSec = Math.max(0, (sample.rxBytes - previous.rxBytes) / deltaSeconds);\n"
-        "                        txBytesPerSec = Math.max(0, (sample.txBytes - previous.txBytes) / deltaSeconds);\n"
-        "                    }\n"
-        "                }\n"
-        "                interfaces.push({ iface, rxBytes: sample.rxBytes, txBytes: sample.txBytes, rxBytesPerSec, txBytesPerSec });\n"
-        "            }\n"
-        "            return { id: 'metrics/network', interfaces };\n"
-        "        } catch (err) {\n"
-        "            this.logger.warn('Failed to compute network metrics: ' + String(err));\n"
-        "            return { id: 'metrics/network', interfaces: [] };\n"
-        "        }\n"
-        "    }\n"
-        "    async systemMetricsNetworkSubscription() {\n"
-        "        return this.subscriptionHelper.createTrackedSubscription('NETWORK_UTILIZATION');\n"
-        "    }"
-    )
-    if old_memory_method not in content:
-        log("memory() method not found, aborting")
-        return False
-    content = content.replace(old_memory_method, new_methods, 1)
-
-    old_memory_resolvefield_dec = (
-        f"_ts_decorate${resolver_d}([\n"
-        f"    ResolveField(()=>MemoryUtilization, {{\n"
-        f"        nullable: true\n"
-        f"    }}),\n"
-        f'    _ts_metadata${resolver_m}("design:type", Function),\n'
-        f'    _ts_metadata${resolver_m}("design:paramtypes", []),\n'
-        f'    _ts_metadata${resolver_m}("design:returntype", Promise)\n'
-        f'], MetricsResolver.prototype, "memory", null);'
-    )
-    new_network_resolvefield = old_memory_resolvefield_dec + (
-        f"\n_ts_decorate${resolver_d}([\n"
-        f"    ResolveField(()=>NetworkUtilization, {{\n"
-        f"        nullable: true\n"
-        f"    }}),\n"
-        f'    _ts_metadata${resolver_m}("design:type", Function),\n'
-        f'    _ts_metadata${resolver_m}("design:paramtypes", []),\n'
-        f'    _ts_metadata${resolver_m}("design:returntype", Promise)\n'
-        f'], MetricsResolver.prototype, "network", null);'
-    )
-    if old_memory_resolvefield_dec not in content:
-        log("memory ResolveField decorator not found, aborting")
-        return False
-    content = content.replace(old_memory_resolvefield_dec, new_network_resolvefield, 1)
-
-    old_memory_sub_dec_end = (
-        '], MetricsResolver.prototype, "systemMetricsMemorySubscription", null);'
-    )
-    new_sub_dec_end = old_memory_sub_dec_end + (
-        f"\n_ts_decorate${resolver_d}([\n"
-        f"    Subscription(()=>NetworkUtilization, {{\n"
-        f"        name: 'systemMetricsNetwork',\n"
-        f"        resolve: (value)=>value.systemMetricsNetwork\n"
-        f"    }}),\n"
-        f"    UsePermissions({{\n"
-        f"        action: AuthAction.READ_ANY,\n"
-        f"        resource: Resource.INFO\n"
-        f"    }}),\n"
-        f'    _ts_metadata${resolver_m}("design:type", Function),\n'
-        f'    _ts_metadata${resolver_m}("design:paramtypes", []),\n'
-        f'    _ts_metadata${resolver_m}("design:returntype", Promise)\n'
-        f'], MetricsResolver.prototype, "systemMetricsNetworkSubscription", null);'
-    )
-    if old_memory_sub_dec_end not in content:
-        log("memory Subscription decorator end not found, aborting")
-        return False
-    content = content.replace(old_memory_sub_dec_end, new_sub_dec_end, 1)
-
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched bundle {os.path.basename(bundle)}")
+    log(
+        f"patched network (InfoNetwork extras + generateNetwork) in "
+        f"{os.path.basename(bundle)}"
+    )
     return True
 
+
 def apply() -> bool:
-    return any([patch_pubsub(), patch_bundle()])
+    return patch_bundle()
