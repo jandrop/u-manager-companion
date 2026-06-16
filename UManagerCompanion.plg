@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.06.16.1">
+<!ENTITY version "2026.06.16.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.06.16.2
+- Fixed the network card showing a blank vendor/model on Unraid running
+  inside a virtual machine (KVM/QEMU guests with virtio NICs). The
+  manufacturer name now surfaces correctly on those setups.
+
 ###2026.06.16.1
 - Removed the parity check resume patch. Unraid Connect now ships the
   upstream fix, so the companion no longer needs to patch it locally.
@@ -291,7 +296,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>84e2c0a69b6a140d841626e7d459ae03fffd16acc63978f69c833e6fd1a80696</SHA256>
+<SHA256>449745b1289753cef537e1ebd3bd7d97ac95b13c7b2684c50dd85e36e6a19608</SHA256>
 </FILE>
 
 <!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
