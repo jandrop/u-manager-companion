@@ -301,8 +301,8 @@ def patch_bundle() -> bool:
     with open(bundle, "w") as f:
         f.write(content)
     log(
-        f"patched network (InfoNetwork extras + generateNetwork) in "
-        f"{os.path.basename(bundle)}"
+        f"fixed network info (vendor/model fields) "
+        f"({os.path.basename(bundle)})"
     )
     return True
 

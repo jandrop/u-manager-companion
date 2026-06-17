@@ -166,7 +166,7 @@ def patch_disks_service_bundle() -> bool:
     content = content[:insert_at] + overlay + content[insert_at:]
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched disks-service no-wake in {os.path.basename(bundle)}")
+    log(f"prevented disk spin-up when fetching disk info ({os.path.basename(bundle)})")
     return True
 
 

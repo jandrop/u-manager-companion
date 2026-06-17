@@ -99,7 +99,7 @@ def patch_array_state_bundle() -> bool:
 
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched array-state fresh mdState in {os.path.basename(bundle)}")
+    log(f"fixed stale array state after start/stop ({os.path.basename(bundle)})")
     return True
 
 

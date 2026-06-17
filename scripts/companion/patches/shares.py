@@ -116,7 +116,7 @@ def patch_share_extra_fields_bundle() -> bool:
     )
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched share extra fields in {os.path.basename(bundle)}")
+    log(f"enabled extra share fields in API ({os.path.basename(bundle)})")
     return True
 
 
@@ -200,7 +200,7 @@ def patch_array_disk_share_enabled_bundle() -> bool:
     )
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched ArrayDisk.shareEnabled in {os.path.basename(bundle)}")
+    log(f"enabled per-disk share toggle in API ({os.path.basename(bundle)})")
     return True
 
 
@@ -233,7 +233,7 @@ def patch_slots_parser_share_enabled_bundle() -> bool:
     content = content.replace(SLOTS_PARSER_OLD, SLOTS_PARSER_NEW, 1)
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched slots parser shareEnabled passthrough in {os.path.basename(bundle)}")
+    log(f"enabled per-disk share toggle pass-through ({os.path.basename(bundle)})")
     return True
 
 
@@ -265,7 +265,7 @@ def patch_shares_parser_use_cache_bundle() -> bool:
     content = content.replace(SHARES_PARSER_OLD, SHARES_PARSER_NEW, 1)
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched shares parser useCache passthrough in {os.path.basename(bundle)}")
+    log(f"enabled cache pool info pass-through ({os.path.basename(bundle)})")
     return True
 
 
@@ -604,7 +604,7 @@ _ts_decorate$6([
     content = content.replace(anchor, anchor + overlay, 1)
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched share mutations in {os.path.basename(bundle)}")
+    log(f"enabled create/edit/delete shares from the app ({os.path.basename(bundle)})")
     return True
 
 
@@ -909,7 +909,7 @@ _ts_decorate$6([
     content = content[:insert_at] + overlay + content[insert_at:]
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched share security in {os.path.basename(bundle)}")
+    log(f"enabled SMB user access in share editor ({os.path.basename(bundle)})")
     return True
 
 
@@ -1060,7 +1060,7 @@ _ts_decorate$6([
     content = content[:insert_at] + overlay + content[insert_at:]
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched shareIsEmpty in {os.path.basename(bundle)}")
+    log(f"enabled empty-share detection in API ({os.path.basename(bundle)})")
     return True
 
 

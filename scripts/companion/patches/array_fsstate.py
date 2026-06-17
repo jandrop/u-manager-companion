@@ -88,7 +88,7 @@ def patch_fsstate_field() -> bool:
     content = content.replace(_FIELD_ANCHOR, _FIELD_BLOCK, 1)
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched UnraidArray.fsState field in {os.path.basename(bundle)}")
+    log(f"enabled array filesystem state field in API ({os.path.basename(bundle)})")
     return True
 
 
@@ -109,7 +109,7 @@ def patch_fsstate_value() -> bool:
     content = content[:idx] + _VALUE_OVERLAY + content[idx:]
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched array fsState value in {os.path.basename(bundle)}")
+    log(f"enabled array filesystem state value in API ({os.path.basename(bundle)})")
     return True
 
 

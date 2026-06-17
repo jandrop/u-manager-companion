@@ -223,7 +223,7 @@ def patch_bundle() -> bool:
 
     with open(bundle, "w") as f:
         f.write(new_content)
-    log(f"patched docker-template-edit in {os.path.basename(bundle)}")
+    log(f"enabled Docker container editing from the app ({os.path.basename(bundle)})")
     return True
 
 

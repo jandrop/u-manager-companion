@@ -131,7 +131,7 @@ def patch_bundle() -> bool:
     new_content = content[:insert_mut] + overlay + content[insert_mut:]
     with open(bundle, "w") as f:
         f.write(new_content)
-    log(f"patched docker-update-stream in {os.path.basename(bundle)}")
+    log(f"enabled live Docker update progress in API ({os.path.basename(bundle)})")
     return True
 
 

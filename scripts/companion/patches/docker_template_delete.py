@@ -92,7 +92,7 @@ def patch_bundle() -> bool:
     new_content = content[:insert_at] + overlay + content[insert_at:]
     with open(bundle, "w") as f:
         f.write(new_content)
-    log(f"patched docker-template-delete in {os.path.basename(bundle)}")
+    log(f"enabled Docker container delete from the app ({os.path.basename(bundle)})")
     return True
 
 

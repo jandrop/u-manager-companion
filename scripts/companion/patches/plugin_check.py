@@ -117,5 +117,5 @@ def apply() -> bool:
 
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched plugin check-for-updates in {os.path.basename(bundle)}")
+    log(f"enabled plugin update check from the app ({os.path.basename(bundle)})")
     return True
