@@ -309,7 +309,7 @@ def patch_installed_plugins_manifest_bundle() -> bool:
 
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched installed-plugins-manifest in {os.path.basename(bundle)}")
+    log(f"enabled detailed installed-plugins info in API ({os.path.basename(bundle)})")
     return True
 
 
@@ -485,7 +485,7 @@ def patch_uninstall_plugin_bundle() -> bool:
 
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched uninstall-plugin in {os.path.basename(bundle)}")
+    log(f"enabled plugin uninstall from the app ({os.path.basename(bundle)})")
     return True
 
 
@@ -530,7 +530,7 @@ def patch_changelog_cdata_strip_bundle() -> bool:
     content = content.replace(CHANGELOG_CDATA_OLD, CHANGELOG_CDATA_NEW, 1)
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched changelog CDATA stripping in {os.path.basename(bundle)}")
+    log(f"fixed plugin changelog parsing for special characters ({os.path.basename(bundle)})")
     return True
 
 

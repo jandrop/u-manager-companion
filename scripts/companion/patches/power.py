@@ -400,7 +400,7 @@ def patch_power_mutations_bundle() -> bool:
 
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched power mutations (namespace) in {os.path.basename(bundle)}")
+    log(f"enabled shutdown/reboot/sleep from the app ({os.path.basename(bundle)})")
     return True
 
 

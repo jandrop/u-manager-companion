@@ -167,7 +167,7 @@ def patch_docker_stats_bundle() -> bool:
     content = content[:insert_at] + overlay + content[insert_at:]
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched docker-stats override in {os.path.basename(bundle)}")
+    log(f"fixed live Docker container stats ({os.path.basename(bundle)})")
     return True
 
 DOCKER_LOGS_OLD = (
@@ -205,7 +205,7 @@ def patch_docker_logs_bundle() -> bool:
     content = content.replace(DOCKER_LOGS_OLD, DOCKER_LOGS_NEW, 1)
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched docker-logs stderr capture in {os.path.basename(bundle)}")
+    log(f"fixed Docker logs missing stderr output ({os.path.basename(bundle)})")
     return True
 
 
@@ -269,7 +269,7 @@ def patch_docker_refresh_bundle() -> bool:
     content = content.replace(DOCKER_REFRESH_OLD, DOCKER_REFRESH_NEW, 1)
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched docker-refresh post-update in {os.path.basename(bundle)}")
+    log(f"fixed Docker list refresh after image update ({os.path.basename(bundle)})")
     return True
 
 

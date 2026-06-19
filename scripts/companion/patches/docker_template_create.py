@@ -135,7 +135,7 @@ def patch_bundle() -> bool:
 
     with open(bundle, "w") as f:
         f.write(new_content)
-    log(f"patched docker-install-stream in {os.path.basename(bundle)}")
+    log(f"enabled live Docker install progress in API ({os.path.basename(bundle)})")
     return True
 
 

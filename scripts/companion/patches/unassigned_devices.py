@@ -206,7 +206,7 @@ def patch_unassigned_devices_bundle() -> bool:
 
     with open(bundle, "w") as f:
         f.write(content)
-    log(f"patched unassigned-devices-info in {os.path.basename(bundle)}")
+    log(f"enabled unassigned-devices filesystem info in API ({os.path.basename(bundle)})")
     return True
 
 

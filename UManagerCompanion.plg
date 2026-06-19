@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.06.16.2">
+<!ENTITY version "2026.06.19.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,15 @@
 
 <CHANGES>
 <![CDATA[
+###2026.06.19.1
+- The U-Manager app can now show how your memory is being used, split into
+  system, ZFS cache, Docker and VMs, matching the Unraid dashboard.
+
+###2026.06.18.1
+- The install progress log now describes what each patch enables in plain
+  language (e.g. "enabled SMB user access in share editor") instead of the
+  cryptic "patched X" lines. No behaviour changes.
+
 ###2026.06.16.2
 - Fixed the network card showing a blank vendor/model on Unraid running
   inside a virtual machine (KVM/QEMU guests with virtio NICs). The
@@ -296,7 +305,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>449745b1289753cef537e1ebd3bd7d97ac95b13c7b2684c50dd85e36e6a19608</SHA256>
+<SHA256>61b3b72a6c38abccc24a05d131aac08645c77e5da17761deda4c134de7776499</SHA256>
 </FILE>
 
 <!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
