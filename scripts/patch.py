@@ -32,6 +32,7 @@ from companion.patches import (
     docker_template_delete,
     docker_template_edit,
     docker_update_stream,
+    memory_breakdown,
     network,
     plugin_check,
     plugins,
@@ -58,6 +59,7 @@ def main() -> int:
         docker_template_edit.apply(),
         docker_update_stream.apply(),
         docker_check_updates.apply(),
+        memory_breakdown.apply(),
     ]
     if any(results):
         restart_api()
