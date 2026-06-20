@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.06.19.1">
+<!ENTITY version "2026.06.20.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,10 @@
 
 <CHANGES>
 <![CDATA[
+###2026.06.20.1
+- The U-Manager app can now show your CPU's live clock speed and system load
+  average (1, 5 and 15 minute) on the dashboard.
+
 ###2026.06.19.1
 - The U-Manager app can now show how your memory is being used, split into
   system, ZFS cache, Docker and VMs, matching the Unraid dashboard.
