@@ -25,6 +25,7 @@ from companion._runtime import log, restart_api
 from companion.patches import (
     array_fsstate,
     array_state,
+    cpu_metrics,
     disks,
     docker,
     docker_check_updates,
@@ -60,6 +61,7 @@ def main() -> int:
         docker_update_stream.apply(),
         docker_check_updates.apply(),
         memory_breakdown.apply(),
+        cpu_metrics.apply(),
     ]
     if any(results):
         restart_api()
