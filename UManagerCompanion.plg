@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.06.19.1">
+<!ENTITY version "2026.06.20.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,10 @@
 
 <CHANGES>
 <![CDATA[
+###2026.06.20.1
+- The U-Manager app can now show your CPU's live clock speed and system load
+  average (1, 5 and 15 minute) on the dashboard.
+
 ###2026.06.19.1
 - The U-Manager app can now show how your memory is being used, split into
   system, ZFS cache, Docker and VMs, matching the Unraid dashboard.
@@ -305,7 +309,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>61b3b72a6c38abccc24a05d131aac08645c77e5da17761deda4c134de7776499</SHA256>
+<SHA256>c9f00e567308b23806d27636ac8cb89fefd34faab1c112ad3b9a30575ecf4c83</SHA256>
 </FILE>
 
 <!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
