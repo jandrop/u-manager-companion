@@ -3,7 +3,10 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.06.20.1">
+<!-- PLACEHOLDER: today's date in Unraid YYYY.MM.DD[.N] format. Bump to the
+     real release date at publish time -- this is local-only for now (no
+     push/PR yet). -->
+<!ENTITY version "2026.07.20.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +19,12 @@
 
 <CHANGES>
 <![CDATA[
+###2026.07.20.1
+- Introduces a standalone U-Manager Companion service running alongside
+  the existing patches (both stay active, nothing you already use stops
+  working). Over time this service will take on the work the patches do
+  today, with a cleaner and more reliable connection to the app.
+
 ###2026.06.20.1
 - The U-Manager app can now show your CPU's live clock speed and system load
   average (1, 5 and 15 minute) on the dashboard.
@@ -49,7 +58,7 @@
 
 ###2026.06.03.1
 - The Unraid Plugins page now shows the plugin as "U-Manager Companion"
-  instead of the internal id. No behaviour changes — same patches,
+  instead of the internal id. No behaviour changes -- same patches,
   same install paths.
 
 ###2026.05.31.2
@@ -94,7 +103,7 @@
   refreshes. Unraid's official `disks` GraphQL resolver was running
   a full SMART read per disk on every call, which spun up modern
   large drives (Seagate Exos and WD Gold of 16 TB or more) out of
-  standby — even when the app only asked for disk identifiers. The
+  standby -- even when the app only asked for disk identifiers. The
   companion now reads identity from sysfs and only consults SMART
   for drives that are already spinning, matching what Unraid's web
   UI does. Upstream tracked at unraid/api#2018.
@@ -114,29 +123,29 @@
 - Expose extra share data to the U-Manager app: primary / secondary
   cache pool, cache usage mode (yes/no/only/prefer) and the per-disk
   "Exclude from shares" flag. Without these the app could only show
-  a partial picture of each share — now the share editor matches
+  a partial picture of each share -- now the share editor matches
   what the web UI shows.
 - Unlock SMB security editing from the U-Manager app. The app can now
   toggle export, case sensitivity, public/secure/private security
   mode and per-user access (read/write, read-only, no access) for
-  every share — same flow as Unraid's web "SMB Security Settings"
+  every share -- same flow as Unraid's web "SMB Security Settings"
   panel.
 
 ###2026.05.26.1
 - Unlock creating, renaming and deleting Unraid shares from the
   U-Manager app. Unraid's official API ships the share endpoints as
-  stubs, so the companion patches them in — the app can now manage
+  stubs, so the companion patches them in -- the app can now manage
   shares without you opening the web UI.
 
 ###2026.05.24.2
-- Clean up the Release Notes view in the U-Manager app — internal XML
+- Clean up the Release Notes view in the U-Manager app -- internal XML
   wrapper text (`<![CDATA[`) no longer appears at the top of the
   changelog the app shows for installed plugins.
 
 ###2026.05.24.1
 - Fix a bug in the official Unraid API that broke the live updates
   the U-Manager app uses for the Array view. Unraid hasn't shipped
-  the fix upstream yet, so the companion patches it locally —
+  the fix upstream yet, so the companion patches it locally --
   changes to disks, parity and pools now reach the app instantly
   instead of waiting for the next poll.
 
@@ -241,7 +250,7 @@
   byte 0 instead of continuing from the saved position. The upstream
   resolver posts `cmdCheck=Resume` to emhttpd, which identifies
   actions by field NAME (not value), so it falls through to the plain
-  `cmdCheck` submit handler — a fresh check — and the saved
+  `cmdCheck` submit handler -- a fresh check -- and the saved
   mdResyncPos is discarded. Patch realigns the field names with the
   ones the Unraid web UI submits (`cmdCheckPause`/`cmdCheckResume`/
   `cmdCheckCancel`). Verified live on Unraid 7.3.0: paused at
@@ -260,7 +269,7 @@
 ###2026.05.16.3
 - Remove the CSRF optional-chaining patch. An A/B test on the live
   server (with and without the patch) confirmed it was not needed for
-  API-key authenticated subscriptions — Passport.js short-circuits the
+  API-key authenticated subscriptions -- Passport.js short-circuits the
   cookie strategy when no cookie is present, so `request.query` is
   never read. Removing the patch shrinks the plugin's footprint
   without affecting U-Manager.
@@ -312,15 +321,58 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <SHA256>c9f00e567308b23806d27636ac8cb89fefd34faab1c112ad3b9a30575ecf4c83</SHA256>
 </FILE>
 
-<!-- Extract the tarball over &plgdir; (it contains patch.py, apply.sh,
-     watcher.sh and the companion/ Python package at the root) and
-     hand control off to apply.sh. Runs on install AND on every boot
-     (Unraid replays plg install on boot). Invoke via bash because
-     /boot is a FAT filesystem that never honours the executable bit,
-     so `chmod +x` is a no-op and direct execution fails with
-     "Permission denied". The `no-same-owner` flag on tar avoids
-     "Cannot change ownership" warnings when extracting as a uid
-     the source machine does not have. -->
+<!-- The standalone GraphQL service bundle (esbuild-produced single-file CJS,
+     service/dist/bundle.cjs). Persisted on /boot alongside the rest of the
+     plugin's on-flash assets; the install script below copies it to the
+     rootfs run dir on every boot, since rootfs is RAM and always empty
+     after reboot.
+
+     PLACEHOLDER URL/SHA256: this is LOCAL-ONLY for now (no push/PR yet) --
+     we are NOT publishing a GitHub Release for the service bundle at this
+     point. Per docs/PLUGIN_PLG_SCHEMA.md, the real URL must eventually be a
+     GitHub Releases asset (releases/download/&version;/...), never a raw
+     URL, so download counters and SHA pinning work the same way the
+     tarball already does. For LOCAL testing, place service/dist/bundle.cjs
+     on the box directly (scp) or serve it from a local HTTP server
+     reachable from the box -- NOT via this placeholder URL, which does not
+     resolve to anything real yet. -->
+<FILE Name="&plgdir;/service/bundle.cjs">
+<URL>https://github.com/&github;/releases/download/&version;/companion-service-&version;.cjs</URL>
+<!-- PLACEHOLDER: real hash computed by scripts/build.sh once the service
+     build output is included in the release pipeline. -->
+<SHA256>0000000000000000000000000000000000000000000000000000000000000000</SHA256>
+</FILE>
+
+<!-- Runs on install AND on every boot (Unraid replays plg install on boot).
+     Invoke via bash because /boot is a FAT filesystem that never honours
+     the executable bit, so `chmod +x` is a no-op and direct execution
+     fails with "Permission denied". The `no-same-owner` flag on tar avoids
+     "Cannot change ownership" warnings when extracting as a uid the source
+     machine does not have.
+
+     Ordering: the OLD version's lifecycle is torn down BEFORE the NEW one
+     starts, so the exact same script works uniformly for a fresh install,
+     an in-place update, AND a boot replay:
+
+       1. pkill both the legacy bundle watcher AND the new service
+          supervisor by their script paths. Harmless no-ops on a fresh
+          install; on an update/boot-replay this guarantees apply.sh's own
+          pgrep spawn-guard (scripts/apply.sh ~lines 79-84) sees a clean
+          slate below and spawns a genuinely fresh watcher, not "already
+          running" against a stale prior-version process.
+       2. Extract the tarball (legacy patch payload) AND copy the service
+          bundle from /boot to the rootfs run dir. The bundle copy is
+          UNCONDITIONAL every boot (not idempotent-skip) because rootfs is
+          RAM and always empty after reboot.
+       3. Run apply.sh FRESH -- keeps the legacy patch pipeline alive
+          (dual-mode). Runs AFTER step 1's pkill so its watcher
+          spawn-guard is guaranteed a clean slate.
+       4. Start the service supervisor (scripts/service-supervisor.sh),
+          which starts the service. We do NOT duplicate the nginx
+          ensure-include/validated-reload logic here in bash -- the
+          service's own startup sequence (startup.ts, runNginxStartupSequence)
+          owns that via COMPANION_NGINX_ENABLED=true (default), run as part
+          of step 5 below when the service process itself starts. -->
 <FILE Run="/bin/bash">
 <INLINE>
 echo ""
@@ -328,9 +380,42 @@ echo "--------------------------------------------"
 echo " Installing &displayName; v&version;"
 echo "--------------------------------------------"
 echo ""
+
+# Step 1: stop the previous version's lifecycle first (both mechanisms),
+# so apply.sh's watcher spawn-guard below always sees a clean slate and the
+# service supervisor never has two generations racing on the same PID file.
+pkill -f "&plgdir;/watcher.sh" 2>/dev/null
+pkill -f "&plgdir;/service-supervisor.sh" 2>/dev/null
+
+# Step 2: extract the legacy patch payload and copy the service bundle to
+# the rootfs run dir. Unconditional every boot -- rootfs is RAM-backed and
+# is always empty again after a reboot.
 tar --no-same-owner -xzf &tarball; -C &plgdir;
 rm -f &tarball;
+mkdir -p /usr/local/emhttp/plugins/&name;/service
+cp &plgdir;/service/bundle.cjs /usr/local/emhttp/plugins/&name;/service/bundle.cjs
+
+# Step 3: run the legacy patch pipeline fresh (dual-mode) --
+# after step 1's pkill, so apply.sh's own pgrep guard spawns a genuinely
+# fresh watcher instead of declining because a stale one looked "running".
 bash &plgdir;/apply.sh
+
+# Step 4: start the service supervisor loop, which starts the service. The
+# service's own startup sequence ensures the nginx same-origin include +
+# performs a validated reload (COMPANION_NGINX_ENABLED=true by default) --
+# not duplicated here in bash.
+#
+# setsid's fork flag detaches the new process from this script's
+# controlling terminal/session by itself, so no separate stdin-from-null
+# redirect is needed on this line. Output is discarded to /dev/null on
+# BOTH descriptors separately (rather than the shorter combine-descriptors
+# redirect form) so this INLINE body never needs a bare ampersand -- this
+# project's established .plg convention keeps bare ampersands out of
+# INLINE bodies entirely (only ENTITY references such as &plgdir; are
+# used), matching the reference UManagerFiles.plg in the u-manager-files
+# repo.
+setsid -f bash &plgdir;/service-supervisor.sh >/dev/null 2>/dev/null
+
 echo ""
 echo " &displayName; installed."
 echo "--------------------------------------------"
@@ -338,12 +423,40 @@ echo ""
 </INLINE>
 </FILE>
 
-<!-- Cleanup on uninstall: we can't undo the runtime patches but we remove our files;
-     the next reboot will load the pristine API bundle from squashfs. -->
+<!-- Cleanup on uninstall: we can't undo the runtime patches but we remove
+     our files; the next reboot will load the pristine API bundle from
+     squashfs.
+
+     Ordering: stop supervisor + service, clean up the nginx include as
+     belt-and-suspenders (the service's own
+     shutdown hook already does this -- service/src/nginx/uninstall.ts,
+     uninstallNginxIntegration() -- but the plugin-side cleanup also runs
+     in case the service was killed uncleanly and never reached its
+     shutdown path), pkill the legacy watcher, then remove the plugin
+     dirs, exactly as before. -->
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
-# Stop the bundle watcher daemon if it's running.
+# Stop the service supervisor (which stops respawning) and the service
+# process itself.
+pkill -f "&plgdir;/service-supervisor.sh" 2>/dev/null
+if [ -f /var/run/u-manager-companion-service.pid ]; then
+    kill "$(cat /var/run/u-manager-companion-service.pid)" 2>/dev/null
+    rm -f /var/run/u-manager-companion-service.pid
+fi
+pkill -f "/usr/local/emhttp/plugins/&name;/service/bundle.cjs" 2>/dev/null
+
+# Belt-and-suspenders nginx cleanup: strip our include + validated reload,
+# in case the service didn't get to run its own shutdown cleanup.
+if [ -f &plgdir;/nginx-cleanup.sh ]; then
+    bash &plgdir;/nginx-cleanup.sh \
+        "&plgdir;/nginx/companion-graphql.conf" \
+        "/etc/nginx/conf.d/locations.conf" \
+        "/usr/sbin/nginx"
+fi
+
+# Stop the legacy bundle watcher daemon if it's running.
 pkill -f "&plgdir;/watcher.sh" 2>/dev/null
+
 rm -rf &plgdir;
 rm -rf /usr/local/emhttp/plugins/&name;
 echo ""
