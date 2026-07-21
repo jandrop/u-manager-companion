@@ -384,11 +384,15 @@ echo " Installing &displayName; v&version;"
 echo "--------------------------------------------"
 echo ""
 
-# Step 1: stop the previous version's lifecycle first (both mechanisms),
-# so apply.sh's watcher spawn-guard below always sees a clean slate and the
-# service supervisor never has two generations racing on the same PID file.
+# Step 1: stop the previous version's lifecycle first (all three: the legacy
+# watcher, the service supervisor, and the service node itself), so apply.sh's
+# watcher spawn-guard below sees a clean slate and step 4's fresh supervisor
+# spawns the newly-copied bundle instead of racing a stale node still holding
+# the old code. The supervisor PID file tracks the supervisor, not the node,
+# so the node is stopped by its run path (matching the remove block below).
 pkill -f "&plgdir;/watcher.sh" 2>/dev/null
 pkill -f "&plgdir;/service-supervisor.sh" 2>/dev/null
+pkill -f "/usr/local/emhttp/plugins/&name;/service/bundle.cjs" 2>/dev/null
 
 # Step 2: extract the legacy patch payload and copy the service bundle to
 # the rootfs run dir. Unconditional every boot -- rootfs is RAM-backed and
