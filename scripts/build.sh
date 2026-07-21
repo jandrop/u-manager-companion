@@ -10,7 +10,17 @@
 #   --mtime fixed        (no per-build timestamps)
 #   gzip -n              (omit embedded mtime in gzip header)
 #
-# Output: dist/companion-<VERSION>.tar.gz + printed SHA256 for the .plg.
+# Output: dist/companion-<VERSION>.tar.gz (legacy patch payload +
+# supervisor/cleanup scripts) + printed SHA256 for the .plg's tarball
+# <FILE> entry.
+#
+# Also copies the standalone GraphQL service bundle (service/dist/bundle.cjs,
+# built separately via `npm run build` inside service/) into dist/ under
+# its own release-asset name and prints its SHA256, for the
+# .plg's SECOND <FILE> entry (the service bundle is fetched to &plgdir;
+# directly, NOT bundled inside the legacy tarball -- it has its own
+# lifecycle: copied to the rootfs run dir on every boot, unlike the
+# extract-once-per-install tarball payload).
 #
 # Usage: scripts/build.sh <version>
 #   scripts/build.sh 2026.05.29.2
@@ -51,7 +61,7 @@ cd scripts
     --no-xattrs \
     --exclude='__pycache__' \
     --exclude='._*' \
-    -cf - patch.py apply.sh watcher.sh companion \
+    -cf - patch.py apply.sh watcher.sh service-supervisor.sh nginx-cleanup.sh companion \
   | gzip -n -9 > "../${OUT}"
 cd ..
 
@@ -63,5 +73,30 @@ echo "Tarball:  $OUT"
 echo "Size:     $SIZE bytes"
 echo "SHA256:   $SHA"
 echo
-echo "Paste into UManagerCompanion.plg:"
+echo "Paste into UManagerCompanion.plg's tarball <FILE> entry:"
 echo "  <SHA256>$SHA</SHA256>"
+
+# Service bundle asset (optional here -- only packaged if the service has
+# already been built via `npm run build` inside service/). Not treated as a
+# hard failure when absent, since build.sh is also used to package
+# tarball-only releases before the service work exists on a given branch.
+SERVICE_BUNDLE="service/dist/bundle.cjs"
+if [ -f "$SERVICE_BUNDLE" ]; then
+    SERVICE_OUT="dist/companion-service-${VERSION}.cjs"
+    cp "$SERVICE_BUNDLE" "$SERVICE_OUT"
+    SERVICE_SHA=$(sha256sum "$SERVICE_OUT" | cut -d' ' -f1)
+    SERVICE_SIZE=$(wc -c < "$SERVICE_OUT" | tr -d ' ')
+
+    echo
+    echo "Service bundle:  $SERVICE_OUT"
+    echo "Size:            $SERVICE_SIZE bytes"
+    echo "SHA256:          $SERVICE_SHA"
+    echo
+    echo "Paste into UManagerCompanion.plg's service bundle <FILE> entry:"
+    echo "  <SHA256>$SERVICE_SHA</SHA256>"
+else
+    echo
+    echo "NOTE: $SERVICE_BUNDLE not found -- skipping service bundle packaging."
+    echo "Run 'npm run build' inside service/ first if this release includes"
+    echo "the standalone GraphQL service."
+fi

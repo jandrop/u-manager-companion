@@ -3,3 +3,9 @@
 *.pyc
 __pycache__/
 dist/
+
+# service/ (Node/TS companion GraphQL service) build outputs
+node_modules/
+service/.node-dist/
+service/sea-config.json.bak
+service/*.tsbuildinfo
