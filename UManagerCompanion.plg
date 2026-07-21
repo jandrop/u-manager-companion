@@ -4,7 +4,7 @@
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
 <!-- PLACEHOLDER: today's date in Unraid YYYY.MM.DD[.N] format. Bump to the
-     real release date at publish time -- this is local-only for now (no
+     real release date at publish time - this is local-only for now (no
      push/PR yet). -->
 <!ENTITY version "2026.07.20.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
@@ -330,14 +330,14 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      rootfs run dir on every boot, since rootfs is RAM and always empty
      after reboot.
 
-     PLACEHOLDER URL/SHA256: this is LOCAL-ONLY for now (no push/PR yet) --
+     PLACEHOLDER URL/SHA256: this is LOCAL-ONLY for now (no push/PR yet) -
      we are NOT publishing a GitHub Release for the service bundle at this
      point. Per docs/PLUGIN_PLG_SCHEMA.md, the real URL must eventually be a
      GitHub Releases asset (releases/download/&version;/...), never a raw
      URL, so download counters and SHA pinning work the same way the
      tarball already does. For LOCAL testing, place service/dist/bundle.cjs
      on the box directly (scp) or serve it from a local HTTP server
-     reachable from the box -- NOT via this placeholder URL, which does not
+     reachable from the box - NOT via this placeholder URL, which does not
      resolve to anything real yet. -->
 <FILE Name="&plgdir;/service/bundle.cjs">
 <URL>https://github.com/&github;/releases/download/&version;/companion-service-&version;.cjs</URL>
@@ -367,12 +367,12 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
           bundle from /boot to the rootfs run dir. The bundle copy is
           UNCONDITIONAL every boot (not idempotent-skip) because rootfs is
           RAM and always empty after reboot.
-       3. Run apply.sh FRESH -- keeps the legacy patch pipeline alive
+       3. Run apply.sh FRESH - keeps the legacy patch pipeline alive
           (dual-mode). Runs AFTER step 1's pkill so its watcher
           spawn-guard is guaranteed a clean slate.
        4. Start the service supervisor (scripts/service-supervisor.sh),
           which starts the service. We do NOT duplicate the nginx
-          ensure-include/validated-reload logic here in bash -- the
+          ensure-include/validated-reload logic here in bash - the
           service's own startup sequence (startup.ts, runNginxStartupSequence)
           owns that via COMPANION_NGINX_ENABLED=true (default), run as part
           of step 5 below when the service process itself starts. -->
@@ -432,8 +432,8 @@ echo ""
 
      Ordering: stop supervisor + service, clean up the nginx include as
      belt-and-suspenders (the service's own
-     shutdown hook already does this -- service/src/nginx/uninstall.ts,
-     uninstallNginxIntegration() -- but the plugin-side cleanup also runs
+     shutdown hook already does this - service/src/nginx/uninstall.ts,
+     uninstallNginxIntegration() - but the plugin-side cleanup also runs
      in case the service was killed uncleanly and never reached its
      shutdown path), pkill the legacy watcher, then remove the plugin
      dirs, exactly as before. -->
