@@ -18,24 +18,55 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build deterministic tarball
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build the standalone GraphQL service bundle
+        # esbuild flattens service/src into service/dist/bundle.cjs, the asset
+        # the .plg's service <FILE> fetches and the supervisor runs with the
+        # box's node. dist/ is gitignored, so it must be built here on every
+        # release; build.sh only PACKAGES bundle.cjs when it already exists.
+        run: |
+          cd service
+          npm ci
+          npm run build
+
+      - name: Build deterministic tarball and package the service bundle
         run: bash scripts/build.sh "${GITHUB_REF_NAME}"
 
-      - name: Inject the tarball SHA256 into UManagerCompanion.plg
-        id: sha
+      - name: Inject the tarball and service-bundle SHA256s into UManagerCompanion.plg
+        # The committed .plg keeps both <SHA256> as placeholder zeros; CI fills
+        # each with its real asset hash here. Each SHA must land in ITS OWN
+        # <FILE> block (tarball vs service bundle), so anchor by <FILE Name=...>
+        # rather than a blanket replace that would clobber both with one value.
         run: |
           TARBALL="dist/companion-${GITHUB_REF_NAME}.tar.gz"
-          SHA=$(sha256sum "$TARBALL" | cut -d' ' -f1)
-          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          sed -i -E "s|<SHA256>[^<]+</SHA256>|<SHA256>${SHA}</SHA256>|" UManagerCompanion.plg
-          echo "Tarball: $TARBALL"
-          echo "SHA256:  $SHA"
-          grep -E '<SHA256>' UManagerCompanion.plg
+          SERVICE="dist/companion-service-${GITHUB_REF_NAME}.cjs"
+          test -f "$TARBALL" || { echo "ERROR: missing $TARBALL"; exit 1; }
+          test -f "$SERVICE" || { echo "ERROR: missing $SERVICE (service build did not run)"; exit 1; }
+          TSHA=$(sha256sum "$TARBALL" | cut -d' ' -f1)
+          SSHA=$(sha256sum "$SERVICE" | cut -d' ' -f1)
+          awk -v tsha="$TSHA" -v ssha="$SSHA" '
+            /<FILE Name="&tarball;">/ { blk="t" }
+            /<FILE Name="&plgdir;\/service\/bundle.cjs">/ { blk="s" }
+            /<SHA256>/ && blk=="t" { sub(/<SHA256>[^<]*<\/SHA256>/, "<SHA256>" tsha "</SHA256>"); blk="" }
+            /<SHA256>/ && blk=="s" { sub(/<SHA256>[^<]*<\/SHA256>/, "<SHA256>" ssha "</SHA256>"); blk="" }
+            { print }
+          ' UManagerCompanion.plg > UManagerCompanion.plg.tmp
+          mv UManagerCompanion.plg.tmp UManagerCompanion.plg
+          echo "Tarball SHA256: $TSHA"
+          echo "Service SHA256: $SSHA"
+          grep -nE '<SHA256>' UManagerCompanion.plg
+          # Guard: no placeholder zero-SHA may survive into a published release.
+          if grep -qE '<SHA256>0{64}</SHA256>' UManagerCompanion.plg; then
+            echo "ERROR: a placeholder SHA256 was left unfilled"; exit 1
+          fi
 
       - name: Commit the updated .plg back to main
         # Existing installations check the .plg at raw.githubusercontent.com/.../main,
-        # so the SHA in that file must match every published tarball. Doing it from
+        # so the SHA in that file must match every published asset. Doing it from
         # CI keeps the source repo SHA-clean (placeholder) and removes the manual
         # bump-and-tag-twice dance. The push targets main directly and does not
         # retrigger this workflow because it only listens on tag pushes.
@@ -52,19 +83,18 @@ jobs:
           git commit -m "release: ${GITHUB_REF_NAME} (.plg SHA from CI)"
           git push origin HEAD:main
 
-      - name: Publish GitHub release with the tarball and .plg
-        # The .plg is uploaded alongside the tarball so download counts
-        # from GitHub's Releases API track real installs — raw.github
-        # fetches of the .plg on main are invisible to the API. The
-        # side feed in u-manager-companion/store/feed.json points the
-        # CA Store at `releases/latest/download/UManagerCompanion.plg`,
-        # which resolves to this asset.
+      - name: Publish GitHub release with the tarball, service bundle and .plg
+        # The .plg is uploaded alongside the assets so download counts from
+        # GitHub's Releases API track real installs. The side feed in
+        # u-manager-companion/store/feed.json points the CA Store at
+        # `releases/latest/download/UManagerCompanion.plg`, which resolves here.
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: |
             dist/companion-${{ github.ref_name }}.tar.gz
+            dist/companion-service-${{ github.ref_name }}.cjs
             UManagerCompanion.plg
           generate_release_notes: false
           fail_on_unmatched_files: true
