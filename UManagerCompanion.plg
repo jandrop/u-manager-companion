@@ -6,7 +6,7 @@
 <!-- PLACEHOLDER: today's date in Unraid YYYY.MM.DD[.N] format. Bump to the
      real release date at publish time - this is local-only for now (no
      push/PR yet). -->
-<!ENTITY version "2026.07.20.1">
+<!ENTITY version "2026.07.21.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -19,11 +19,8 @@
 
 <CHANGES>
 <![CDATA[
-###2026.07.20.1
-- Introduces a standalone U-Manager Companion service running alongside
-  the existing patches (both stay active, nothing you already use stops
-  working). Over time this service will take on the work the patches do
-  today, with a cleaner and more reliable connection to the app.
+###2026.07.21.1
+- Preparing support for U-Manager 2.0
 
 ###2026.06.20.1
 - The U-Manager app can now show your CPU's live clock speed and system load
