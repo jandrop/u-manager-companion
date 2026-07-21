@@ -9,14 +9,16 @@
  * about the app repo's own toolchain (we only regex-extract raw GraphQL
  * document strings out of .dart source).
  *
- * Scope: only the v1 op documents the SDL actually covers (docker
- * template install/edit/delete, docker update streams + checkForUpdates,
+ * Scope: only the op documents the SDL actually covers (docker template
+ * install/edit/delete, docker update streams + checkForUpdates,
  * serverPower shutdown/reboot/sleep, unraidPlugins uninstall/checkForUpdates,
- * dockerInstallOperation query, dockerInstallUpdates subscription). The
- * companion catalogue also carries shares/network/array/metrics/plugins-
- * detailed ops that are explicitly OUT of v1 schema scope (those other
- * domains aren't part of the v1 shape) -- parity for those is not this
- * gate's job.
+ * dockerInstallOperation query, dockerInstallUpdates subscription, and --
+ * as of Slice 1 (companion-category-a-migration) -- shares list/security/
+ * security-users/is-empty queries and createShare/updateShare/deleteShare/
+ * updateShareSecurity/updateShareAccess mutations). The companion
+ * catalogue also carries network/array/metrics/plugins-detailed ops that
+ * remain OUT of schema scope until their own migration slices land --
+ * parity for those is not this gate's job yet.
  *
  * TDD: written before the extraction helper exists -> RED first.
  */
@@ -51,13 +53,20 @@ const COMPANION_CATALOGUE_ROOT = path.join(
   'companion',
 );
 
-/** The specific v1 op-catalogue files the SDL (schema.graphql) covers. */
+/** The specific v1 op-catalogue files the SDL (schema.graphql) covers.
+ * Slice 1 (companion-category-a-migration) adds the shares queries +
+ * mutations -- both now validate against the SDL's root
+ * shares/shareSecurity/shareSecurityUsers/shareIsEmpty queries and
+ * createShare/updateShare/deleteShare/updateShareSecurity/
+ * updateShareAccess mutations. */
 const V1_CATALOGUE_FILES = [
   'mutations/unraid_graphql_docker_template_mutations.dart',
   'mutations/unraid_graphql_docker_mutations.dart',
   'mutations/unraid_graphql_server_power_mutations.dart',
   'mutations/unraid_graphql_plugins_mutations.dart',
+  'mutations/unraid_graphql_shares_mutations.dart',
   'queries/unraid_graphql_docker_template_queries.dart',
+  'queries/unraid_graphql_shares_queries.dart',
   'subscriptions/unraid_graphql_docker_template_subscriptions.dart',
 ] as const;
 

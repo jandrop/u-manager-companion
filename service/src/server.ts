@@ -77,6 +77,18 @@ import { checkForDockerUpdates } from './features/docker_update/check-updates.js
 import { shutdownServer, rebootServer, sleepServer } from './features/power/power.js';
 import { uninstallPlugin } from './features/plugins/uninstall.js';
 import { checkForPluginUpdates } from './features/plugins/check-updates.js';
+import {
+  createShare,
+  deleteShare,
+  getShareIsEmpty,
+  getShareSecurity,
+  getShareSecurityUsers,
+  listShares,
+  updateShare,
+  updateShareAccess,
+  updateShareSecurity,
+} from './features/shares/resolvers.js';
+import { createEmhttpdClient } from './features/shares/platform.js';
 import { existsSync, promises as fsPromises } from 'node:fs';
 import path from 'node:path';
 
@@ -181,6 +193,9 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
   const dockerClient = createDockerClient();
   const writeTemplate = (name: string, xmlContent: string) =>
     writeTemplateFile(TEMPLATES_USER_DIR, name, xmlContent);
+  // createEmhttpdClient() with no args wires the default (native
+  // shares.ini parse) getShares -- see platform.ts's module doc.
+  const sharesClient = createEmhttpdClient();
 
   return {
     installDockerTemplate: (input) =>
@@ -235,6 +250,17 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
     uninstallPlugin: (filename) =>
       uninstallPlugin(filename, { runPluginCli: runStreamedProcess, audit, caller }),
     checkForPluginUpdates: () => checkForPluginUpdates({ runDetached: runDetachedProcess, audit }),
+    listShares: () => listShares({ client: sharesClient }),
+    getShareSecurity: (name) => getShareSecurity(name, { client: sharesClient }),
+    getShareSecurityUsers: () => getShareSecurityUsers({ client: sharesClient }),
+    getShareIsEmpty: (name) => getShareIsEmpty(name, { client: sharesClient }),
+    createShare: (name, settings) => createShare(name, settings, { client: sharesClient, audit, caller }),
+    updateShare: (name, settings) => updateShare(name, settings, { client: sharesClient, audit, caller }),
+    deleteShare: (name) => deleteShare(name, { client: sharesClient, audit, caller }),
+    updateShareSecurity: (name, settings) =>
+      updateShareSecurity(name, settings, { client: sharesClient, audit, caller }),
+    updateShareAccess: (name, access) =>
+      updateShareAccess(name, access, { client: sharesClient, audit, caller }),
   };
 }
 

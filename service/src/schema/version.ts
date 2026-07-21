@@ -30,6 +30,7 @@ export const CAPABILITY_KEYS = [
   'power',
   'plugins.uninstall',
   'plugins.checkForUpdates',
+  'shares',
 ] as const;
 
 /** Union of every valid capability key string. */

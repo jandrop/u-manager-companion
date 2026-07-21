@@ -20,25 +20,42 @@ describe('schema.graphql', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('declares the v1 Mutation namespaces (docker, serverPower, unraidPlugins)', () => {
+  it('declares the v1 Mutation namespaces (docker, serverPower, unraidPlugins) plus the Slice 1 root share mutations', () => {
     const sdl = readFileSync(SDL_PATH, 'utf8');
     const schema = buildSchema(sdl);
     const mutationType = schema.getMutationType();
     expect(mutationType).toBeDefined();
     const fields = mutationType!.getFields();
     expect(Object.keys(fields).sort()).toEqual(
-      ['docker', 'serverPower', 'unraidPlugins'].sort(),
+      [
+        'docker',
+        'serverPower',
+        'unraidPlugins',
+        'createShare',
+        'updateShare',
+        'deleteShare',
+        'updateShareSecurity',
+        'updateShareAccess',
+      ].sort(),
     );
   });
 
-  it('declares the v1 Query fields (dockerInstallOperation, dockerTemplate, capabilities)', () => {
+  it('declares the v1 Query fields (dockerInstallOperation, dockerTemplate, capabilities) plus the Slice 1 root share queries', () => {
     const sdl = readFileSync(SDL_PATH, 'utf8');
     const schema = buildSchema(sdl);
     const queryType = schema.getQueryType();
     expect(queryType).toBeDefined();
     const fields = queryType!.getFields();
     expect(Object.keys(fields).sort()).toEqual(
-      ['capabilities', 'dockerInstallOperation', 'dockerTemplate'].sort(),
+      [
+        'capabilities',
+        'dockerInstallOperation',
+        'dockerTemplate',
+        'shares',
+        'shareSecurity',
+        'shareSecurityUsers',
+        'shareIsEmpty',
+      ].sort(),
     );
   });
 
@@ -81,6 +98,7 @@ describe('CAPABILITY_KEYS', () => {
         'power',
         'plugins.uninstall',
         'plugins.checkForUpdates',
+        'shares',
       ].sort(),
     );
   });

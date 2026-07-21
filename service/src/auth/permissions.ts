@@ -7,10 +7,20 @@
  *   - docker template install/edit/delete, docker update streams -> DOCKER (update)
  *   - power shutdown/reboot/sleep -> SERVERS (update)
  *   - plugin uninstall/update-check -> PLUGINS (update)
+ *   - shares mutations (create/update/delete/security/access) -> SHARE (update)
+ *     (the legacy patch itself splits shares.py's UsePermissions calls across
+ *     CREATE_ANY/UPDATE_ANY/DELETE_ANY on Resource.SHARE; this service
+ *     collapses that to a single 'shares' capability key gated on
+ *     SHARE:update -- v1 has no per-CRUD-verb permission granularity, matching
+ *     every other v1 capability's single update-gate posture)
  *
  * Operation keys reuse CAPABILITY_KEYS naming (schema/version.ts) so the
  * same string identifies a capability AND a permission-checked
- * operation -- one vocabulary, not two.
+ * operation -- one vocabulary, not two. Read-only share queries
+ * (shares/shareSecurity/shareSecurityUsers/shareIsEmpty) are NOT
+ * permission-gated in resolvers.ts -- same posture as `capabilities`
+ * itself and matching the legacy patch's READ_ANY gate, which every
+ * authenticated identity satisfies once past auth.
  */
 import type { CapabilityKey } from '../schema/version.js';
 import type { Authority, ResolvedIdentity } from './keystore.js';
@@ -21,7 +31,7 @@ import type { Authority, ResolvedIdentity } from './keystore.js';
  * here. */
 export type CompanionOperation = CapabilityKey;
 
-export type PermissionResource = 'DOCKER' | 'SERVERS' | 'PLUGINS';
+export type PermissionResource = 'DOCKER' | 'SERVERS' | 'PLUGINS' | 'SHARE';
 export type PermissionAction = 'update';
 
 export interface RequiredPermission {
@@ -44,6 +54,7 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   power: { resource: 'SERVERS', action: 'update' },
   'plugins.uninstall': { resource: 'PLUGINS', action: 'update' },
   'plugins.checkForUpdates': { resource: 'PLUGINS', action: 'update' },
+  shares: { resource: 'SHARE', action: 'update' },
 };
 
 function permissionKey(permission: RequiredPermission): string {

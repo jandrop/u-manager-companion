@@ -39,6 +39,14 @@ import type { DockerInstallSubject } from './features/docker_template/install.js
 import type { DockerTemplateEditInput } from './features/docker_template/edit.js';
 import type { ParsedDockerTemplate, DockerConfigEntryTypeXml } from './features/docker_template/xml.js';
 import type { PluginInstallSubject } from './features/plugins/uninstall.js';
+import type {
+  ShareAccessEntry,
+  ShareRecord,
+  ShareSecurity,
+  ShareSecurityUpdateInput,
+  ShareSecurityUser,
+  ShareSettingsInput,
+} from './features/shares/platform.js';
 
 // ---------------------------------------------------------------------------
 // Context + injected feature-module surface
@@ -81,6 +89,31 @@ export interface FeatureModuleDeps {
     caller: AuditCaller,
   ) => OperationSnapshot<PluginInstallSubject>;
   readonly checkForPluginUpdates: () => boolean;
+  readonly listShares: () => Promise<readonly ShareRecord[]>;
+  readonly getShareSecurity: (name: string) => Promise<ShareSecurity>;
+  readonly getShareSecurityUsers: () => Promise<readonly ShareSecurityUser[]>;
+  readonly getShareIsEmpty: (name: string) => Promise<boolean>;
+  readonly createShare: (
+    name: string,
+    settings: ShareSettingsInput,
+    caller: AuditCaller,
+  ) => Promise<ShareRecord>;
+  readonly updateShare: (
+    name: string,
+    settings: ShareSettingsInput,
+    caller: AuditCaller,
+  ) => Promise<ShareRecord | undefined>;
+  readonly deleteShare: (name: string, caller: AuditCaller) => Promise<boolean>;
+  readonly updateShareSecurity: (
+    name: string,
+    settings: ShareSecurityUpdateInput,
+    caller: AuditCaller,
+  ) => Promise<boolean>;
+  readonly updateShareAccess: (
+    name: string,
+    access: readonly ShareAccessEntry[],
+    caller: AuditCaller,
+  ) => Promise<boolean>;
 }
 
 export interface GraphqlContext {
@@ -285,12 +318,83 @@ export const resolvers = {
     capabilities(): ReturnType<typeof getCapabilities> {
       return getCapabilities();
     },
+    // Shares queries are read-only -- NOT permission-gated (matches
+    // capabilities' own posture and the legacy patch's READ_ANY gate,
+    // which every authenticated identity satisfies once past auth).
+    shares(
+      _parent: unknown,
+      _args: Record<string, never>,
+      context: GraphqlContext,
+    ): Promise<readonly ShareRecord[]> {
+      return context.deps.listShares();
+    },
+    shareSecurity(
+      _parent: unknown,
+      args: { name: string },
+      context: GraphqlContext,
+    ): Promise<ShareSecurity> {
+      return context.deps.getShareSecurity(args.name);
+    },
+    shareSecurityUsers(
+      _parent: unknown,
+      _args: Record<string, never>,
+      context: GraphqlContext,
+    ): Promise<readonly ShareSecurityUser[]> {
+      return context.deps.getShareSecurityUsers();
+    },
+    shareIsEmpty(
+      _parent: unknown,
+      args: { name: string },
+      context: GraphqlContext,
+    ): Promise<boolean> {
+      return context.deps.getShareIsEmpty(args.name);
+    },
   },
 
   Mutation: {
     docker: (): Record<string, never> => ({}),
     serverPower: (): Record<string, never> => ({}),
     unraidPlugins: (): Record<string, never> => ({}),
+    createShare(
+      _parent: unknown,
+      args: { name: string; settings?: ShareSettingsInput | null },
+      context: GraphqlContext,
+    ): Promise<ShareRecord> {
+      const caller = requirePermission(context, 'shares');
+      return context.deps.createShare(args.name, args.settings ?? {}, caller);
+    },
+    updateShare(
+      _parent: unknown,
+      args: { name: string; settings?: ShareSettingsInput | null },
+      context: GraphqlContext,
+    ): Promise<ShareRecord | undefined> {
+      const caller = requirePermission(context, 'shares');
+      return context.deps.updateShare(args.name, args.settings ?? {}, caller);
+    },
+    deleteShare(
+      _parent: unknown,
+      args: { name: string },
+      context: GraphqlContext,
+    ): Promise<boolean> {
+      const caller = requirePermission(context, 'shares');
+      return context.deps.deleteShare(args.name, caller);
+    },
+    updateShareSecurity(
+      _parent: unknown,
+      args: { name: string; settings?: ShareSecurityUpdateInput | null },
+      context: GraphqlContext,
+    ): Promise<boolean> {
+      const caller = requirePermission(context, 'shares');
+      return context.deps.updateShareSecurity(args.name, args.settings ?? {}, caller);
+    },
+    updateShareAccess(
+      _parent: unknown,
+      args: { name: string; access: readonly ShareAccessEntry[] },
+      context: GraphqlContext,
+    ): Promise<boolean> {
+      const caller = requirePermission(context, 'shares');
+      return context.deps.updateShareAccess(args.name, args.access, caller);
+    },
   },
 
   DockerMutations: {
