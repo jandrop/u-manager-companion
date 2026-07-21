@@ -318,7 +318,10 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      CDN copy aborts the install instead of installing broken code. -->
 <FILE Name="&tarball;">
 <URL>&tarballURL;</URL>
-<SHA256>c9f00e567308b23806d27636ac8cb89fefd34faab1c112ad3b9a30575ecf4c83</SHA256>
+<!-- Placeholder in the source repo; CI computes and injects the real SHA at
+     release time (see .github/workflows/release.yml), same as the service
+     bundle below. Keeps the committed .plg SHA-clean. -->
+<SHA256>0000000000000000000000000000000000000000000000000000000000000000</SHA256>
 </FILE>
 
 <!-- The standalone GraphQL service bundle (esbuild-produced single-file CJS,
