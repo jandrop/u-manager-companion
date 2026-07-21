@@ -1,0 +1,232 @@
+# u-manager-companion service schema -- v1 (SCHEMA_VERSION in version.ts).
+#
+# This SDL is the migration contract: every field, argument, type and
+# nullability choice here mirrors exactly what the app's companion op
+# catalogue selects under
+# packages/unraid_api/lib/src/graphql/companion/**/*.dart in the u_manager
+# repo, so existing DTOs deserialize unchanged. Field/type names below are
+# cross-referenced against:
+#   - mutations/unraid_graphql_docker_template_mutations.dart
+#   - mutations/unraid_graphql_docker_mutations.dart
+#   - mutations/unraid_graphql_server_power_mutations.dart
+#   - mutations/unraid_graphql_plugins_mutations.dart
+#   - queries/unraid_graphql_docker_template_queries.dart (dockerInstallOperationQuery, dockerTemplateQuery)
+#   - subscriptions/unraid_graphql_docker_template_subscriptions.dart
+#   - unraid_domain/lib/src/entities/docker_install_operation.dart (DockerInstallStatus enum)
+#
+# Schema-only scope here (SDL + version/capabilities); resolver wiring
+# binding these fields to server.ts and the feature modules lives
+# separately -- only the capabilities resolver (health.ts) exists at this
+# stage.
+
+"Upstream unraid-api's prefixed-ID scalar (e.g. \"docker:<hash>\"). updateContainerStream($id: PrefixedID!) selects this exact scalar name -- kept as a distinct scalar rather than aliasing to ID so an accidental bare-ID argument mismatch fails catalogue parity instead of silently type-checking."
+scalar PrefixedID
+
+type Query {
+  "Snapshot fetch for a tracked docker install/edit/update operation. Returns null once the operation TTL (15 min post-completion) has expired."
+  dockerInstallOperation(operationId: ID!): DockerInstallOperation
+
+  "Returns the saved user template for an existing Docker container (read from templates-user/my-<name>.xml on the server). Returns null when no template is on disk for the given name. Hydrates the Edit screen's form."
+  dockerTemplate(name: String!): DockerTemplate
+
+  "Service self-description: schema version + serviceVersion + served capability keys. Primary signal for CompanionStatusCubit detection."
+  capabilities: CompanionCapabilities!
+}
+
+type Mutation {
+  docker: DockerMutations!
+  serverPower: ServerPowerMutations!
+  unraidPlugins: UnraidPluginsMutations!
+}
+
+type Subscription {
+  "Per-line/status-transition delta feed for a docker install, edit, or update operation. Same channel is fed by installDockerTemplate, updateDockerTemplate, updateContainerStream and updateAllContainersStream."
+  dockerInstallUpdates(operationId: ID!): DockerInstallEvent!
+}
+
+# ---------------------------------------------------------------------------
+# Mutation namespaces
+# ---------------------------------------------------------------------------
+
+type DockerMutations {
+  "Starts an async Docker template install (CA Store flow). Returns the operation snapshot immediately; subscribe to dockerInstallUpdates(operationId) for progress."
+  installDockerTemplate(input: DockerTemplateInput!): DockerInstallOperation!
+
+  "Starts an async Docker template edit: stop+remove existing container, rewrite my-<Name>.xml, re-pull image, recreate via rebuild_container. input.name must match the existing container name."
+  updateDockerTemplate(input: DockerTemplateInput!): DockerInstallOperation!
+
+  "Uninstalls a CA-installed Docker container (stop+remove; optionally remove image + prune volumes). Synchronous -- returns true on success."
+  deleteDockerTemplate(
+    name: String!
+    removeContainer: Boolean
+    removeImage: Boolean
+  ): Boolean!
+
+  "Streaming single-container update. Returns the operation immediately (status=RUNNING); subscribe to dockerInstallUpdates(operationId)."
+  updateContainerStream(id: PrefixedID!): DockerInstallOperation!
+
+  "Streaming update-all: finds every container with an available update and runs the per-container pipeline under one operation."
+  updateAllContainersStream: DockerInstallOperation!
+
+  "Synchronous refresh of the update-status cache (re-pulls each template, queries remote registry digests). Returns true on success."
+  checkForUpdates: Boolean!
+}
+
+type ServerPowerMutations {
+  "Cleanly stops the array and powers the server off. Fire-and-forget -- audited BEFORE the detached call fires."
+  shutdown: Boolean!
+
+  "Cleanly stops the array and reboots the server. Fire-and-forget, audited BEFORE the detached call fires."
+  reboot: Boolean!
+
+  "Puts the server into S3 sleep. Guarded on the Dynamix S3 Sleep plugin script's existence. Fire-and-forget, audited BEFORE the detached call fires."
+  sleep: Boolean!
+}
+
+type UnraidPluginsMutations {
+  "Uninstalls an Unraid plugin by .plg filename. Returns a PluginInstallOperation (same shape/channel model as DockerInstallOperation) so pluginInstallUpdates-equivalent progress can be tracked. Audited."
+  uninstallPlugin(filename: String!): PluginInstallOperation!
+
+  "Triggers a background plugin update check (plugin checkall semantics). Returns true once the check is kicked off -- the boolean does not indicate check outcome. NOT audited (non-privileged read)."
+  checkForUpdates: Boolean!
+}
+
+# ---------------------------------------------------------------------------
+# Operation snapshot / event types
+# ---------------------------------------------------------------------------
+
+"Lifecycle status shared by docker install/edit/update operations. Mirrors unraid_domain's DockerInstallStatus enum (QUEUED/RUNNING/SUCCEEDED/FAILED wire strings)."
+enum DockerInstallStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+"Tracked docker template install/edit/update operation snapshot. Returned immediately by the triggering mutation and by the dockerInstallOperation(id) snapshot query."
+type DockerInstallOperation {
+  id: ID!
+  containerName: String!
+  repository: String!
+  status: DockerInstallStatus!
+  createdAt: String!
+  updatedAt: String
+  finishedAt: String
+  "Cumulative output lines since the operation started, capped at the most recent 500 (ring buffer)."
+  output: [String!]!
+}
+
+"Single delta event emitted by the dockerInstallUpdates subscription. output carries only the NEW lines since the previous event, not the cumulative buffer."
+type DockerInstallEvent {
+  operationId: ID!
+  status: DockerInstallStatus!
+  output: [String!]
+  timestamp: String!
+}
+
+"Tracked plugin uninstall operation snapshot. Reuses the DockerInstallOperation shape/semantics (design: 'the resolver reuses the shape')."
+type PluginInstallOperation {
+  id: ID!
+  url: String
+  name: String!
+  status: DockerInstallStatus!
+  createdAt: String!
+  updatedAt: String
+  finishedAt: String
+  output: [String!]!
+}
+
+# ---------------------------------------------------------------------------
+# Docker template input shape
+# ---------------------------------------------------------------------------
+
+"Config entry kind. Wire values are upper-case; the app's data source maps them to/from XML-derived title-case (Path/Port/Variable/Label/Device)."
+enum DockerConfigEntryType {
+  PATH
+  PORT
+  VARIABLE
+  LABEL
+  DEVICE
+}
+
+input DockerTemplateConfigInput {
+  name: String!
+  type: DockerConfigEntryType!
+  target: String!
+  value: String!
+  default: String!
+  mode: String!
+  description: String!
+  display: String!
+  required: Boolean!
+  mask: Boolean!
+}
+
+"Config entry as read back from an on-disk template (dockerTemplate query). Field set matches DockerTemplateConfigInput's output-side mirror in unraid_graphql_docker_template_queries.dart's dockerTemplateQuery selection."
+type DockerTemplateConfig {
+  name: String!
+  type: DockerConfigEntryType!
+  target: String!
+  value: String!
+  default: String!
+  mode: String!
+  description: String!
+  display: String!
+  required: Boolean!
+  mask: Boolean!
+}
+
+"Saved user template for an existing Docker container, as read back by the dockerTemplate(name) query. Field set mirrors dockerTemplateQuery's selection in unraid_graphql_docker_template_queries.dart exactly."
+type DockerTemplate {
+  name: String!
+  repository: String!
+  network: String!
+  privileged: Boolean!
+  shell: String!
+  overview: String
+  icon: String
+  webui: String
+  support: String
+  project: String
+  readme: String
+  registry: String
+  extraParams: String
+  postArgs: String
+  cpuset: String
+  fixedMac: String
+  configs: [DockerTemplateConfig!]!
+}
+
+"Install/edit payload -- shape matches DockerTemplateRemoteEntity's _templateToGraphqlInput mapping in the app's docker_template_data_source.dart exactly (field-for-field, including nullability)."
+input DockerTemplateInput {
+  name: String!
+  repository: String!
+  network: String!
+  privileged: Boolean!
+  shell: String!
+  overview: String
+  icon: String
+  webui: String
+  support: String
+  project: String
+  readme: String
+  registry: String
+  extraParams: String
+  postArgs: String
+  cpuset: String
+  fixedMac: String
+  configs: [DockerTemplateConfigInput!]!
+}
+
+# ---------------------------------------------------------------------------
+# Capabilities / versioning
+# ---------------------------------------------------------------------------
+
+type CompanionCapabilities {
+  "Bumps only on breaking SDL changes; additive fields never bump it."
+  schemaVersion: String!
+  "Service package version (semver), independent of schemaVersion."
+  serviceVersion: String!
+  "Capability keys this running service serves -- see schema/version.ts CAPABILITY_KEYS. The app gates per-capability routing on membership in this list."
+  features: [String!]!
+}
