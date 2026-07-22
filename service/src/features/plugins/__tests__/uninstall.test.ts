@@ -3,15 +3,13 @@
  *
  * TDD: written before uninstall.ts exists -> RED first.
  *
- * Ported behavior target: plugins.py's `uninstallPlugin(filename)` service
- * method -- validates the filename (non-empty, no path separators/NUL,
- * must end in .plg), streams `plugin remove <filename>` through the
- * operation engine (this service's operations/registry.ts, not the
- * bundle-local Map), audited on start. Uses the SAME
- * PluginInstallOperation shape/channel model as DockerInstallOperation per
- * schema.graphql -- so this reuses operations/registry.ts exactly like
- * docker_template/install.ts does, just with a plugins-specific channel
- * prefix and subject shape.
+ * Covers `uninstallPlugin(filename)`: validates the filename (non-empty,
+ * no path separators/NUL, must end in .plg), streams `plugin remove
+ * <filename>` through the operation engine (operations/registry.ts),
+ * audited on start. Uses the SAME PluginInstallOperation shape/channel
+ * model as DockerInstallOperation per schema.graphql -- so this reuses
+ * operations/registry.ts exactly like docker_template/install.ts does,
+ * just with a plugins-specific channel prefix and subject shape.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';

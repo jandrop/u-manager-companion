@@ -2,14 +2,13 @@
  * Operation -> required action+resource permission map, and the
  * authorization check against a resolved identity.
  *
- * Mapping mirrors the permission gates already encoded in the legacy
- * patches:
+ * Permission gates by area:
  *   - docker template install/edit/delete, docker update streams -> DOCKER (update)
  *   - power shutdown/reboot/sleep -> SERVERS (update)
  *   - plugin uninstall/update-check -> PLUGINS (update)
  *   - shares mutations (create/update/delete/security/access) -> SHARE (update)
- *     (the legacy patch itself splits shares.py's UsePermissions calls across
- *     CREATE_ANY/UPDATE_ANY/DELETE_ANY on Resource.SHARE; this service
+ *     (Unraid's own permission model splits share access into separate
+ *     CREATE_ANY/UPDATE_ANY/DELETE_ANY grants on Resource.SHARE; this service
  *     collapses that to a single 'shares' capability key gated on
  *     SHARE:update -- v1 has no per-CRUD-verb permission granularity, matching
  *     every other v1 capability's single update-gate posture)
@@ -19,8 +18,8 @@
  * operation -- one vocabulary, not two. Read-only share queries
  * (shares/shareSecurity/shareSecurityUsers/shareIsEmpty) are NOT
  * permission-gated in resolvers.ts -- same posture as `capabilities`
- * itself and matching the legacy patch's READ_ANY gate, which every
- * authenticated identity satisfies once past auth.
+ * itself: any authenticated identity satisfies a read-only gate once past
+ * auth, so these queries don't need per-permission checks.
  */
 import type { CapabilityKey } from '../schema/version.js';
 import type { Authority, ResolvedIdentity } from './keystore.js';

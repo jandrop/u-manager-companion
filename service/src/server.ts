@@ -10,10 +10,10 @@
  *     attach a `graphql-ws` WebSocket upgrade handler to the SAME server.
  *     Same-origin HTTP + WS on one loopback port requires owning the
  *     `http.Server` ourselves.
- *   - `graphql-ws`'s `useServer` (the reference server implementation of the
- *     `graphql-transport-ws` subprotocol -- exact match to the app's
- *     `graphql_flutter` client) mounted on a `ws.WebSocketServer` attached
- *     to the SAME `http.Server`'s `upgrade` event.
+ *   - `graphql-ws`'s `useServer` (implements the `graphql-transport-ws`
+ *     subprotocol -- exact match to the app's `graphql_flutter` client)
+ *     mounted on a `ws.WebSocketServer` attached to the SAME
+ *     `http.Server`'s `upgrade` event.
  *   - `context.ts`'s auth pipeline for both transports: HTTP via the
  *     `x-api-key` header per request; WS via the `connection_init` payload,
  *     resolved ONCE per socket in `onConnect` (WS auth is connection-level,
@@ -146,11 +146,10 @@ const S3_SLEEP_SCRIPT = '/usr/local/emhttp/plugins/dynamix.s3.sleep/scripts/rc.s
 
 /**
  * Reads "every container with an available update" from Unraid's own
- * update-status cache -- mirrors the reference implementation's
- * `readUpdatableTargets()` (see update.ts module doc). Kept deliberately
- * tolerant of a missing/malformed cache file: an empty or
- * unreadable status file means "no known updates," not a hard failure
- * (matches the Python reference's own best-effort read).
+ * update-status cache (see update.ts module doc for the digest-pair
+ * format). Kept deliberately tolerant of a missing/malformed cache file:
+ * an empty or unreadable status file means "no known updates," not a
+ * hard failure.
  */
 async function listUpdatableContainerNames(): Promise<readonly string[]> {
   const statusPath = '/var/lib/docker/unraid-update-status.json';
@@ -159,9 +158,9 @@ async function listUpdatableContainerNames(): Promise<readonly string[]> {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return [];
     // Shape: { [containerName]: { local: string, remote: string } } --
-    // updatable when local !== remote. Matches the reference's digest-pair
-    // comparison; any entry that doesn't fit this shape is skipped rather
-    // than throwing, so one malformed entry never blocks every other one.
+    // updatable when local !== remote. Any entry that doesn't fit this
+    // shape is skipped rather than throwing, so one malformed entry never
+    // blocks every other one.
     const entries = Object.entries(parsed as Record<string, unknown>);
     const updatable: string[] = [];
     for (const [name, value] of entries) {

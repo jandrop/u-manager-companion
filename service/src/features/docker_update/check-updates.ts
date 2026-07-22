@@ -1,13 +1,12 @@
 /**
  * docker.checkForUpdates.
  *
- * Ported from `docker_check_updates.py`: shells to the dynamix
- * `dockerupdate` CLI (no args) and returns true iff it exits 0. Mirrors
- * the "Check for Updates" button on the Unraid Docker page (refreshes
- * `/var/lib/docker/unraid-update-status.json` so `updateAvailable` flags
- * surface on the next container list fetch). Synchronous mutation
- * (`Boolean!` in the SDL, no streamed operation) -- unlike
- * install/edit/update, this runs to completion before returning.
+ * Shells to the dynamix `dockerupdate` CLI (no args) and returns true iff
+ * it exits 0. Mirrors the "Check for Updates" button on the Unraid Docker
+ * page (refreshes `/var/lib/docker/unraid-update-status.json` so
+ * `updateAvailable` flags surface on the next container list fetch).
+ * Synchronous mutation (`Boolean!` in the SDL, no streamed operation) --
+ * unlike install/edit/update, this runs to completion before returning.
  *
  * Privileged + audited (auth/permissions.ts maps 'docker.checkForUpdates'
  * to DOCKER:update) -- distinct from the plugins-namespace

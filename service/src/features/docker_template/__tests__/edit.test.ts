@@ -3,18 +3,14 @@
  *
  * TDD: written before edit.ts exists -> RED first.
  *
- * Ported behavior target: docker_template_edit.py's `start()`/`runUpdate()`
- * pipeline -- stop existing container, remove it, overwrite my-<Name>.xml,
- * pull the image ONLY if missing (never a stealth update -- the dedicated
- * "Update Container" mutation is the unconditional-pull path), rebuild via
- * rebuild_container, audited. input.name must match the EXISTING container
- * (no rename support). The PHP `xmlToCommand` cosmetic log-decoration step
- * from the Python patch is intentionally NOT ported -- it only reproduces
- * a webgui log-formatting nicety (rendering the equivalent `docker run`
- * command line) with no functional effect on the edit outcome, and shelling
- * to `php -r` is exactly the kind of PHP-CLI dependency the native
- * TypeScript reimplementation is meant to remove: a native reimplementation,
- * not shelling into the bundle.
+ * Covers the edit pipeline: stop existing container, remove it, overwrite
+ * my-<Name>.xml, pull the image ONLY if missing (never a stealth update --
+ * the dedicated "Update Container" mutation is the unconditional-pull
+ * path), rebuild via rebuild_container, audited. input.name must match the
+ * EXISTING container (no rename support). There is no cosmetic log-line
+ * rendering of the equivalent `docker run` command here -- it has no
+ * functional effect on the edit outcome and would mean shelling out to
+ * `php -r`, which this service avoids entirely.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';

@@ -3,14 +3,14 @@
  *
  * TDD: written before power.ts exists -> RED first.
  *
- * Ported behavior target: power.py PHASE B (ServerService methods) --
- * shutdown -> `/sbin/poweroff`, reboot -> `/sbin/reboot`, both detached
- * fire-and-forget. sleep -> guarded on the Dynamix S3 Sleep plugin script
- * existing, then detached `rc.s3sleep`. CRITICAL ordering pin: the log
- * must survive process death, so the audit entry MUST be recorded BEFORE
- * the detached call fires, since /sbin/poweroff or /sbin/reboot can
- * terminate this process before a completion signal could ever be
- * recorded -- these tests assert call ORDER, not just that both happened.
+ * Covers the ServerService power methods: shutdown -> `/sbin/poweroff`,
+ * reboot -> `/sbin/reboot`, both detached fire-and-forget. sleep ->
+ * guarded on the Dynamix S3 Sleep plugin script existing, then detached
+ * `rc.s3sleep`. CRITICAL ordering pin: the log must survive process
+ * death, so the audit entry MUST be recorded BEFORE the detached call
+ * fires, since /sbin/poweroff or /sbin/reboot can terminate this process
+ * before a completion signal could ever be recorded -- these tests assert
+ * call ORDER, not just that both happened.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';

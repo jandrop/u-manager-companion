@@ -1,9 +1,8 @@
 /**
  * installDockerTemplate (streaming).
  *
- * Direct TypeScript port of `docker_template_create.py`'s IIFE `start()`/
- * `runInstall()` pipeline, retargeted at this service's operation registry
- * (operations/registry.ts) instead of the bundle-local Map/pubsub pair:
+ * Runs the install pipeline against this service's operation registry
+ * (operations/registry.ts):
  *
  *   1. write `my-<Name>.xml` to templates-user (xml.ts's buildTemplateXml).
  *   2. pull the image via the injected DockerClient (progress lines).
@@ -68,8 +67,7 @@ function templatePath(name: string): string {
 }
 
 /** Renders one dockerode pull-progress event to a human-readable line, or
- * null when the event carries nothing worth showing. Ported verbatim from
- * the Python patches' `formatPullEvent()`. */
+ * null when the event carries nothing worth showing. */
 function formatPullEvent(event: DockerPullProgressEvent): string | null {
   if (event.error) return `Error: ${event.error}`;
   if (!event.status) return null;

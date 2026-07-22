@@ -1,16 +1,15 @@
 /**
  * Streaming-operation registry.
  *
- * Direct TypeScript port of the proven in-bundle IIFE state machine in
- * `docker_template_create.py` (PATCH_MARKER "docker-install-stream-v2"):
- * same `Map<id, Operation>` store, same ring-buffer cap (drop-oldest), same
- * QUEUED/RUNNING/SUCCEEDED/FAILED status transitions, same delta-only
- * publish-per-append semantics, same unref'd-timer TTL cleanup, same
- * snapshot-returns-null-after-cleanup contract. Kept feature-agnostic (no
- * Docker-specific fields) so every streaming feature (docker install/update,
- * plugin install/uninstall) shares one engine instead of re-deriving the
- * state machine per feature module ("no feature imports
- * another feature" -- feature modules import this registry, not each other).
+ * A generic state machine for long-running operations: a `Map<id, Operation>`
+ * store with a ring-buffer output cap (drop-oldest), QUEUED/RUNNING/
+ * SUCCEEDED/FAILED status transitions, delta-only publish-per-append
+ * semantics, unref'd-timer TTL cleanup, and a snapshot-returns-null-after-
+ * cleanup contract. Kept feature-agnostic (no Docker-specific fields) so
+ * every streaming feature (docker install/update, plugin install/uninstall)
+ * shares one engine instead of re-deriving the state machine per feature
+ * module ("no feature imports another feature" -- feature modules import
+ * this registry, not each other).
  */
 import { randomUUID } from 'node:crypto';
 import { channelFor, pubsub } from '../pubsub';
@@ -19,17 +18,15 @@ import { channelFor, pubsub } from '../pubsub';
 export type OperationStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 
 /**
- * Per-operation output cap. Ported verbatim from docker_template_create.py's
- * `MAX_OUTPUT_LINES = 500` -- oldest lines are dropped once exceeded, so a
+ * Per-operation output cap: oldest lines are dropped once exceeded, so a
  * long-running operation's snapshot never grows unbounded.
  */
 export const MAX_OUTPUT_LINES = 500;
 
 /**
- * Completed-operation retention window before cleanup, in milliseconds.
- * Ported verbatim from docker_template_create.py's `COMPLETED_TTL_MS =
- * 15 * 60 * 1000` -- gives reconnecting clients a snapshot window after
- * backgrounding, without operations accumulating forever.
+ * Completed-operation retention window before cleanup, in milliseconds --
+ * gives reconnecting clients a snapshot window after backgrounding,
+ * without operations accumulating forever.
  */
 export const TTL_MS = 15 * 60 * 1000;
 
@@ -118,10 +115,9 @@ export function appendLine(id: string, line: string): void {
 /**
  * Transitions RUNNING -> SUCCEEDED, stamps finishedAt/updatedAt, publishes a
  * status-only event (no output field), and schedules TTL cleanup. No-op if
- * the operation is unknown or already in a terminal state (SUCCEEDED/FAILED)
- * -- matches the reference implementation's `if (op.status !== 'RUNNING')
- * return;` guard, so a late completion signal can never override an
- * already-terminal outcome.
+ * the operation is unknown or already in a terminal state (SUCCEEDED/FAILED),
+ * so a late completion signal can never override an already-terminal
+ * outcome.
  */
 export function succeedOperation(id: string): void {
   const record = operations.get(id);
@@ -169,8 +165,7 @@ function publishEvent(record: OperationRecord, deltaLines: readonly string[]): v
     ...(deltaLines.length ? { output: deltaLines } : {}),
   };
   // Best-effort: a publish failure (e.g. no active subscribers) must never
-  // fail the caller's mutation/feature-module work. Mirrors the reference
-  // implementation's try/catch around pubsub.publish.
+  // fail the caller's mutation/feature-module work.
   void pubsub.publish(channelFor(record.channelPrefix, record.id), event).catch(() => {
     /* best-effort */
   });
@@ -178,11 +173,10 @@ function publishEvent(record: OperationRecord, deltaLines: readonly string[]): v
 
 /**
  * Schedules operation deletion after TTL_MS. Uses an unref'd timer so a
- * pending cleanup never keeps the Node process alive on its own -- matches
- * the reference implementation's `if (typeof timer.unref === 'function')
- * timer.unref();`. Replaces any previously scheduled cleanup for the same
- * id (defensive; the terminal-state guards on succeed/failOperation mean
- * this should only ever fire once per operation in practice).
+ * pending cleanup never keeps the Node process alive on its own. Replaces
+ * any previously scheduled cleanup for the same id (defensive; the
+ * terminal-state guards on succeed/failOperation mean this should only
+ * ever fire once per operation in practice).
  */
 function scheduleCleanup(id: string): void {
   const existing = cleanupTimers.get(id);

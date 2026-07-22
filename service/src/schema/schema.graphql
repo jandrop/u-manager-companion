@@ -267,7 +267,7 @@ input DockerTemplateInput {
 # Shares (Slice 1 -- companion-category-a-migration)
 # ---------------------------------------------------------------------------
 
-"User share, as read from shares.ini. Field set mirrors sharesQuery's selection in unraid_graphql_shares_queries.dart exactly, including the companion-added useCache/cachePool/cachePool2 extra fields (see patches/shares.py's share-extra-fields overlay: the stock unraid-api Share type ships only a derived `cache: Boolean`, not the three raw .cfg-backed values the share editor needs to pre-populate its dropdowns). Numeric fields (free/used/size) and include/exclude are typed to match ShareRemoteEntity's wire expectations exactly (int-valued sizes; include/exclude as a single delimited string, not a list -- ShareRemoteEntity's _parseStringOrList defensively also accepts a list, but the native field this mirrors is scalar)."
+"User share, as read from shares.ini. Field set mirrors sharesQuery's selection in unraid_graphql_shares_queries.dart exactly, including the useCache/cachePool/cachePool2 extra fields the share editor needs to pre-populate its dropdowns (the stock unraid-api Share type ships only a derived `cache: Boolean`, not these three raw .cfg-backed values). Numeric fields (free/used/size) are int-valued, and include/exclude are each a single delimited string rather than a list."
 type Share {
   id: ID!
   name: String!

@@ -3,7 +3,7 @@
  *
  * TDD: written before check-updates.ts exists -> RED first.
  *
- * Ported behavior target: docker_check_updates.py -- shells to
+ * Covers `checkForDockerUpdates`: shells to
  * `dynamix.docker.manager/scripts/dockerupdate` (no args) and returns
  * true iff its exit code is 0. Mirrors the "Check for Updates" button on
  * the Unraid Docker page. `docker.checkForUpdates` is a privileged

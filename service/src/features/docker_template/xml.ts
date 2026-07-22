@@ -1,21 +1,15 @@
 /**
  * Docker template XML builder/parser + container-name sanitisation.
  *
- * PARITY-CRITICAL: ported verbatim (byte-for-byte output) from
- * `docker_template_create.py`'s `buildTemplateXml()`/`configToXml()`/
- * `sanitiseName()` and `docker_template_edit.py`'s identical write-side
- * copies plus its read-side `parseTemplateXml()`/`readTag()`/
- * `readBool()`/`unescXml()`. The written file is
- * `/boot/config/plugins/dockerMan/templates-user/my-<Name>.xml`, read by
- * Unraid's own dockerMan UI and by CA's "Previous Apps" flow -- any
- * structural drift here (attribute order, self-closing vs. body-value
- * Config rendering, escaping) breaks interop with code this project does
- * not own. Golden-string tests in __tests__/xml.test.ts pin this exact
- * shape.
+ * The written file is `/boot/config/plugins/dockerMan/templates-user/
+ * my-<Name>.xml`, read by Unraid's own dockerMan UI and by CA's
+ * "Previous Apps" flow -- any structural drift here (attribute order,
+ * self-closing vs. body-value Config rendering, escaping) breaks interop
+ * with code this project does not own. Golden-string tests in
+ * __tests__/xml.test.ts pin this exact shape.
  */
 
-/** Allowed container-name charset, ported verbatim from the Python
- * patches' `sanitiseName()`. */
+/** Allowed container-name charset. */
 const NAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
 
 /**
@@ -151,8 +145,7 @@ function pushTag(lines: string[], tag: string, value: string | undefined): void 
 }
 
 /**
- * Renders the full `my-<Name>.xml` document. Tag order is FIXED -- matches
- * `docker_template_create.py`'s `buildTemplateXml()` line-for-line,
+ * Renders the full `my-<Name>.xml` document. Tag order is FIXED,
  * including the empty `<MyIP/>` placeholder (kept for on-disk format
  * parity even though this project never populates it) and `<MyMAC>` being
  * OMITTED ENTIRELY (not just self-closed) when fixedMac is absent.
@@ -201,8 +194,7 @@ function readBool(xml: string, tag: string): boolean | null {
 
 /**
  * Parses a `my-<Name>.xml` document back into the shape an Edit form
- * hydrates from. Ported verbatim from `docker_template_edit.py`'s
- * `parseTemplateXml()`/`readTag()`/`readBool()`.
+ * hydrates from.
  */
 export function parseTemplateXml(xml: string): ParsedDockerTemplate {
   const configs: ParsedDockerConfigEntry[] = [];

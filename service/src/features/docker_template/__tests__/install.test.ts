@@ -3,8 +3,7 @@
  *
  * TDD: written before install.ts exists -> RED first.
  *
- * Ported behavior target: docker_template_create.py's `start()`/
- * `runInstall()` pipeline -- write template XML, pull image (progress
+ * Covers the install pipeline: write template XML, pull image (progress
  * lines), run rebuild_container (streamed), idempotent start() (304 =
  * already running), audited. Platform side effects (fs write, docker pull,
  * rebuild_container process, dockerode start) are ALL injected fakes here

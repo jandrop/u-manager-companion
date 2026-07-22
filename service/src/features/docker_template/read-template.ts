@@ -1,8 +1,7 @@
 /**
  * dockerTemplate(name) query.
  *
- * Ported from `docker_template_edit.py`'s `readTemplate()`: reads
- * templates-user/my-<name>.xml and parses it via xml.ts's
+ * Reads templates-user/my-<name>.xml and parses it via xml.ts's
  * parseTemplateXml, returning null when no template exists on disk
  * (matches the mutation's "hydrate an Edit form" use case). This is a
  * READ, not a privileged action -- NOT audited, since only privileged

@@ -16,10 +16,8 @@
  *   3. GraphQL-shape mapping -- operations/registry.ts's
  *      OperationSnapshot<TSubject> is GENERIC (a `subject` field, never
  *      Docker/plugin-shaped). toDockerInstallOperation()/
- *      toPluginInstallOperation() below are this service's equivalent of
- *      the reference bundle's `toGraphqlOperation()` step: they narrow a
- *      snapshot's subject into the SDL's DockerInstallOperation /
- *      PluginInstallOperation shape.
+ *      toPluginInstallOperation() below narrow a snapshot's subject into
+ *      the SDL's DockerInstallOperation / PluginInstallOperation shape.
  *
  * Does NOT wire the Apollo server itself -- this module only exports the
  * `resolvers` map object; mounting it onto Apollo Server + graphql-ws is
@@ -192,8 +190,7 @@ function toPluginInstallOperation(
  * install/edit/updateContainerStream/updateAllContainersStream -- matches
  * install.ts's DOCKER_INSTALL_CHANNEL_PREFIX constant (duplicated here as
  * a literal to avoid resolvers.ts depending on install.ts purely for a
- * string constant; both must stay in sync with the ported reference's
- * `CHANNEL_PREFIX`). */
+ * string constant; both must stay in sync with each other). */
 const DOCKER_INSTALL_CHANNEL_PREFIX = 'DOCKER_INSTALL';
 const PLUGIN_INSTALL_CHANNEL_PREFIX = 'PLUGIN_INSTALL';
 
@@ -319,8 +316,8 @@ export const resolvers = {
       return getCapabilities();
     },
     // Shares queries are read-only -- NOT permission-gated (matches
-    // capabilities' own posture and the legacy patch's READ_ANY gate,
-    // which every authenticated identity satisfies once past auth).
+    // capabilities' own posture: any authenticated identity can read
+    // these once past auth).
     shares(
       _parent: unknown,
       _args: Record<string, never>,

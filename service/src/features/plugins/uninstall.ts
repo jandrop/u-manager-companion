@@ -1,16 +1,13 @@
 /**
  * unraidPlugins.uninstallPlugin(filename).
  *
- * Ported from `plugins.py`'s `uninstallPlugin(filename)` service method:
- * validates the filename (non-empty, no path separators or NUL bytes,
+ * Validates the filename (non-empty, no path separators or NUL bytes,
  * must end in `.plg`), then streams `plugin remove <filename>` through
- * the operation engine -- retargeted at THIS service's
- * operations/registry.ts (generic OperationSnapshot) instead of the
- * bundle-local operations Map the reference used. Audited on start,
- * since uninstall is a privileged action. Uses the SAME
- * PluginInstallOperation shape/channel model as DockerInstallOperation
- * (schema.graphql), matching the reference's comment that plugin ops
- * "track through the same operation pipeline the install flow uses."
+ * this service's operations/registry.ts (generic OperationSnapshot).
+ * Audited on start, since uninstall is a privileged action. Uses the
+ * SAME PluginInstallOperation shape/channel model as
+ * DockerInstallOperation (schema.graphql), since plugin ops track
+ * through the same operation pipeline the install flow uses.
  */
 import {
   appendLine,
@@ -37,12 +34,11 @@ export interface UninstallPluginDeps {
 }
 
 /**
- * Validates a presented `.plg` filename. Ported verbatim from the
- * reference's inline checks in `uninstallPlugin()`: non-empty after trim,
- * no `/`, `\`, or NUL byte (path-traversal guard -- the filename is used
- * as a bare CLI argument, never joined into a path by this module, but
- * the reference's defensive check is kept for parity and defense in
- * depth), and must end with `.plg` (case-insensitive).
+ * Validates a presented `.plg` filename: non-empty after trim, no `/`,
+ * `\`, or NUL byte (path-traversal guard -- the filename is used as a
+ * bare CLI argument, never joined into a path by this module, but the
+ * check stays in for defense in depth), and must end with `.plg`
+ * (case-insensitive).
  */
 function validateFilename(raw: string): string {
   const trimmed = raw.trim();

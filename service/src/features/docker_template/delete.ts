@@ -1,10 +1,9 @@
 /**
  * deleteDockerTemplate.
  *
- * Ported from `docker_template_delete.py`'s `uninstallLikeWebUi()`/
- * `deleteTemplate()`: stop the container if running, remove it (no force,
- * no anonymous-volume wipe), optionally remove its image (swallowing a 409
- * ImageInUse the same way the Unraid PHP handler does) and prune orphaned
+ * Stops the container if running, removes it (no force, no
+ * anonymous-volume wipe), optionally removes its image (swallowing a 409
+ * ImageInUse the same way the Unraid PHP handler does) and prunes orphaned
  * anonymous volumes. The user-template XML under templates-user is
  * DELIBERATELY LEFT IN PLACE so the entry resurfaces as a "Previous App"
  * in the CA UI for one-click reinstall -- this module never touches the
