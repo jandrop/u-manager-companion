@@ -3,15 +3,12 @@
  *
  * TDD: written before xml.ts exists -> RED first.
  *
- * GOLDEN-STRING PARITY: buildTemplateXml/configToXml/sanitiseName here MUST
- * match the CURRENT patched bundle output BYTE-FOR-BYTE -- ported verbatim
- * from `docker_template_create.py`'s `buildTemplateXml()`/`configToXml()`/
- * `sanitiseName()` (and cross-checked against `docker_template_edit.py`'s
- * identical copies + its `parseTemplateXml()`/`readTag()`/`unescXml()`
- * read-side). The app's DTOs and the demo server depend on this exact
- * shape -- any structural drift (attribute order, escaping, empty-tag
- * self-closing, config self-closing-vs-body-value) is a parity break, not a
- * style choice.
+ * GOLDEN-STRING TESTS: asserts the exact rendered XML output of
+ * buildTemplateXml/configToXml/sanitiseName (and the matching read-side
+ * parseTemplateXml/readTag/unescXml). The app's DTOs and the demo server
+ * depend on this exact shape -- any structural drift (attribute order,
+ * escaping, empty-tag self-closing, config self-closing-vs-body-value) is
+ * a breaking change, not a style choice.
  */
 import { describe, expect, it } from 'vitest';
 import {

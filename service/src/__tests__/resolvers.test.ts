@@ -44,6 +44,16 @@ function makeContext(overrides: Partial<GraphqlContext['deps']> = {}, identity =
       sleepServer: vi.fn().mockReturnValue(true),
       uninstallPlugin: vi.fn(),
       checkForPluginUpdates: vi.fn().mockReturnValue(true),
+      listShares: vi.fn().mockResolvedValue([]),
+      getShareSecurity: vi.fn(),
+      getShareSecurityUsers: vi.fn(),
+      getShareIsEmpty: vi.fn(),
+      createShare: vi.fn(),
+      updateShare: vi.fn(),
+      deleteShare: vi.fn().mockResolvedValue(true),
+      updateShareSecurity: vi.fn().mockResolvedValue(true),
+      updateShareAccess: vi.fn().mockResolvedValue(true),
+      listInstalledPluginsDetailed: vi.fn().mockResolvedValue([]),
       ...overrides,
     },
   };
@@ -157,6 +167,75 @@ describe('resolvers.Query.dockerInstallOperation', () => {
     const context = makeContext();
     const result = resolvers.Query.dockerInstallOperation({}, { operationId: 'nope' }, context);
     expect(result).toBeNull();
+  });
+});
+
+describe('resolvers.Query.installedUnraidPluginsDetailed', () => {
+  it('maps records straight through and formats lastCheckedAt as an ISO string', async () => {
+    const context = makeContext({
+      listInstalledPluginsDetailed: vi.fn().mockResolvedValue([
+        {
+          filename: 'tailscale.plg',
+          name: 'tailscale',
+          author: 'Ich777',
+          version: '2026.05.07',
+          description: 'A secure network client.',
+          pluginURL: 'https://example.com/tailscale.plg',
+          support: null,
+          icon: null,
+          launch: null,
+          changelog: null,
+          latestVersion: '2026.06.01',
+          lastCheckedAt: new Date('2026-06-01T12:00:00.000Z'),
+        },
+      ]),
+    });
+
+    const result = await resolvers.Query.installedUnraidPluginsDetailed({}, {}, context);
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        filename: 'tailscale.plg',
+        name: 'tailscale',
+        latestVersion: '2026.06.01',
+        lastCheckedAt: '2026-06-01T12:00:00.000Z',
+      }),
+    ]);
+  });
+
+  it('maps a null lastCheckedAt through as null', async () => {
+    const context = makeContext({
+      listInstalledPluginsDetailed: vi.fn().mockResolvedValue([
+        {
+          filename: 'x.plg',
+          name: 'x',
+          author: null,
+          version: null,
+          description: null,
+          pluginURL: null,
+          support: null,
+          icon: null,
+          launch: null,
+          changelog: null,
+          latestVersion: null,
+          lastCheckedAt: null,
+        },
+      ]),
+    });
+
+    const [result] = await resolvers.Query.installedUnraidPluginsDetailed({}, {}, context);
+
+    expect(result!.lastCheckedAt).toBeNull();
+  });
+
+  it('is NOT permission-gated -- a read-only caller can call it', async () => {
+    const context = makeContext(
+      { listInstalledPluginsDetailed: vi.fn().mockResolvedValue([]) },
+      makeIdentity('read-only'),
+    );
+    await expect(
+      resolvers.Query.installedUnraidPluginsDetailed({}, {}, context),
+    ).resolves.toEqual([]);
   });
 });
 

@@ -1,12 +1,11 @@
 /**
  * unraidPlugins.checkForUpdates.
  *
- * Ported from `plugin_check.py`: fires `plugin checkall` DETACHED
- * (fire-and-forget) and returns true immediately, without waiting for the
- * check to finish -- the boolean does NOT indicate check outcome; per the
- * reference's own doc, "the client polls the list afterwards" (re-queries
- * `installedUnraidPluginsDetailed` to pick up refreshed `latestVersion`
- * fields once the background check completes).
+ * Fires `plugin checkall` DETACHED (fire-and-forget) and returns true
+ * immediately, without waiting for the check to finish -- the boolean
+ * does NOT indicate check outcome; the client polls the list afterwards
+ * (re-queries `installedUnraidPluginsDetailed` to pick up refreshed
+ * `latestVersion` fields once the background check completes).
  *
  * Deliberately NOT audited: the read-only update-check is not privileged
  * and is not audited. The `audit` dependency is still accepted (rather

@@ -3,28 +3,26 @@
  *
  * Every real fs/nginx/socket path the startup sequence (startup.ts) and
  * server.ts need is resolved HERE, once, from environment overrides with
- * box-verified defaults -- never hardcoded ad hoc at call sites.
+ * sensible defaults -- never hardcoded ad hoc at call sites.
  * Kept as plain data + one factory function (no class) so tests can construct
  * an independent CompanionConfig per test without any module-level mutable
- * state, matching the injectable-everything pattern the rest of the service
- * already follows (auth/keystore.ts's resolveKeyStoreDir(), server.ts's
- * resolvePort()).
+ * state, matching the injectable pattern the rest of the service follows
+ * (auth/keystore.ts's resolveKeyStoreDir(), server.ts's resolvePort()).
  *
  * nginx integration is TOGGLEABLE (nginxEnabled) so the service can start in
- * a "no nginx" mode for local/dev smoke tests off-box -- box-real
+ * a "no nginx" mode for local/dev smoke tests off-box -- the real
  * paths under /etc/nginx and /usr/sbin/nginx would simply fail on darwin/CI,
  * and there is no reason a local capabilities-query smoke test should depend
  * on a real nginx installation being present.
  */
 
-/** Real, box-verified nginx paths: locations.conf is GENERATED
+/** Real nginx paths on Unraid: locations.conf is GENERATED
  * by /etc/rc.d/rc.nginx and included inside every server block; nginx itself
  * is directly usable at /usr/sbin/nginx for -t/-s reload. */
 const DEFAULT_LOCATIONS_CONF_PATH = '/etc/nginx/conf.d/locations.conf';
 const DEFAULT_NGINX_BINARY_PATH = '/usr/sbin/nginx';
 
-/** Plugin-owned paths, named from &name; = u-manager-companion (clean-room
- * naming) -- persisted under /boot (flash); our own include file lives
+/** Plugin-owned paths under /boot (flash); our own include file lives
  * alongside the rest of the plugin's on-flash assets. */
 const DEFAULT_PLUGIN_BOOT_DIR = '/boot/config/plugins/u-manager-companion';
 const DEFAULT_INCLUDE_PATH = `${DEFAULT_PLUGIN_BOOT_DIR}/nginx/companion-graphql.conf`;
@@ -35,25 +33,21 @@ const DEFAULT_INCLUDE_PATH = `${DEFAULT_PLUGIN_BOOT_DIR}/nginx/companion-graphql
 const DEFAULT_RUN_DIR = '/usr/local/emhttp/plugins/u-manager-companion/service';
 
 /** Loopback-only bind port for the GraphQL service itself (127.0.0.1 only,
- * nginx proxies /companion/graphql to this port). Same
- * default server.ts's original placeholder already used, kept for continuity
- * across the rewrite. */
+ * nginx proxies /companion/graphql to this port). */
 const DEFAULT_SERVICE_PORT = 34400;
 
-/** Box-verified production unix socket path for the local unraid-api's
- * own GraphQL endpoint -- MUST match auth/identity.ts's own
- * DEFAULT_LOCAL_API_SOCKET_PATH constant exactly (kept as a duplicated
- * literal rather than a cross-module import so config.ts stays free of a
- * dependency on the auth module; both are box-verified against the SAME
- * fact and covered by server.test.ts's end-to-end auth smoke tests). */
+/** Production unix socket path for the local unraid-api's own GraphQL
+ * endpoint -- MUST match auth/identity.ts's DEFAULT_LOCAL_API_SOCKET_PATH
+ * exactly (kept as a duplicated literal rather than a cross-module import so
+ * config.ts stays free of a dependency on the auth module; both point at the
+ * same path and are covered by server.test.ts's auth smoke tests). */
 const DEFAULT_LOCAL_API_SOCKET_PATH = '/var/run/unraid-api.sock';
 
 /** Unraid's own update-status cache (local!=remote digest pairs) -- the
  * source of truth `readUpdatableTargets()`/`listUpdatableContainerNames()`
  * reads AND the file `syncUpdateStatusForRepo()` (docker_update/update.ts)
  * rewrites after a successful update so the "update available" badge
- * clears. Same box-verified path the reference `docker_update_stream.py`
- * patch used. */
+ * clears. */
 const DEFAULT_UPDATE_STATUS_PATH = '/var/lib/docker/unraid-update-status.json';
 
 /** Unraid webui's per-container info cache (dynamix.docker.manager) --
@@ -69,20 +63,20 @@ export interface CompanionConfig {
   /** On-disk API key-store directory (auth/keystore.ts). */
   readonly keyStoreDir: string;
   /** Local unraid-api GraphQL endpoint for the `{ me }` fallback probe
-   * (tcp transport). UNDEFINED by default -- the box-verified production
+   * (tcp transport). UNDEFINED by default -- the production
    * default is the UNIX SOCKET transport in
    * auth/identity.ts, not this tcp URL. Only set (via COMPANION_LOCAL_API_URL)
    * for dev environments where unraid-api listens on tcp instead (e.g.
    * `.env.development`'s port 3001). When undefined, localApiSocketPath is
    * used instead. */
   readonly localApiUrl: string | undefined;
-  /** Local unraid-api unix socket path (box-verified production default
+  /** Local unraid-api unix socket path (production default
    * transport). Only consulted when localApiUrl is
    * undefined -- mirrors auth/identity.ts's own resolveIdentityViaMeFallback
    * priority (explicit tcp URL wins if present, socket otherwise). */
   readonly localApiSocketPath: string;
   /** Whether the nginx same-origin integration (include + self-heal) runs
-   * at all. False in local/dev/test "no nginx" mode (task 7.2). */
+   * at all. False in local/dev/test "no nginx" mode. */
   readonly nginxEnabled: boolean;
   /** Platform-generated locations.conf the service appends its include line
    * to (nginx/locations-append.ts, self-heal-monitor.ts). */
@@ -122,11 +116,11 @@ function parsePortEnv(raw: string | undefined, defaultValue: number): number {
 }
 
 /**
- * Resolves the full runtime config from environment overrides + box-verified
- * defaults. Called once at service startup (startup.ts); every module that
+ * Resolves the full runtime config from environment overrides + defaults.
+ * Called once at service startup (startup.ts); every module that
  * needs a real path receives it from the resulting CompanionConfig object
  * rather than re-reading process.env itself, EXCEPT the modules that already
- * had their own resolve*() default-env pattern from earlier batches
+ * have their own resolve*() default-env pattern
  * (auth/keystore.ts's resolveKeyStoreDir(), auth/identity.ts's
  * resolveDefaultLocalApiUrl()) -- resolveCompanionConfig() defers to those
  * existing resolvers for keyStoreDir/localApiUrl so there is exactly ONE

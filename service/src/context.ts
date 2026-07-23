@@ -61,7 +61,7 @@ export interface ContextCache {
   get(keyHash: string): ResolvedIdentity | null;
   set(keyHash: string, identity: ResolvedIdentity): void;
   /** Clears every entry immediately. Called by the fs-watch invalidator
-   * (task 3.5) and the poll fallback when the key store changes. */
+   * and the poll fallback when the key store changes. */
   invalidateAll(): void;
   /** Test/debug-only: returns the raw cache keys (hashes) currently
    * stored, so tests can assert the raw key is never a cache key. */

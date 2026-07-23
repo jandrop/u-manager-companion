@@ -1,24 +1,22 @@
 /**
  * updateDockerTemplate (streaming edit).
  *
- * Ported from `docker_template_edit.py`'s IIFE `start()`/`runUpdate()`
- * pipeline: stop the existing container, remove it, overwrite
- * my-<Name>.xml, pull ONLY if the image is missing locally (never a
- * stealth update -- `updateContainerStream` is the unconditional-pull
- * mutation), rebuild via rebuild_container. Deliberately does NOT call
- * `.start()` afterward: rebuild_container itself preserves autostart
- * behavior (stops the new container if the old one wasn't in Unraid's
- * autostart list), so calling start() unconditionally would resurrect a
- * container the user had intentionally stopped -- matching the Python
- * patch's explicit comment on this point.
+ * Stops the existing container, removes it, overwrites my-<Name>.xml,
+ * pulls ONLY if the image is missing locally (never a stealth update --
+ * `updateContainerStream` is the unconditional-pull mutation), then
+ * rebuilds via rebuild_container. Deliberately does NOT call `.start()`
+ * afterward: rebuild_container itself preserves autostart behavior (stops
+ * the new container if the old one wasn't in Unraid's autostart list), so
+ * calling start() unconditionally would resurrect a container the user
+ * had intentionally stopped.
  *
- * The PHP `xmlToCommand`/`buildDockerRunCommand` cosmetic log-decoration
- * step from the Python patch is NOT ported (see edit.test.ts's module doc
- * for the rationale) -- it reproduces a webgui log-formatting nicety with
- * no functional effect on the edit outcome.
+ * There is no cosmetic log-line rendering of the equivalent `docker run`
+ * command here (see edit.test.ts's module doc) -- it has no functional
+ * effect on the edit outcome and would mean shelling out to `php -r`,
+ * which this service avoids entirely.
  *
  * input.name MUST match the existing container name -- rename is not
- * supported in this mutation, matching the reference implementation.
+ * supported in this mutation.
  */
 import {
   appendLine,

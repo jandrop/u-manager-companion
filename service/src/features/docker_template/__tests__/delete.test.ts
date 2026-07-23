@@ -3,12 +3,11 @@
  *
  * TDD: written before delete.ts exists -> RED first.
  *
- * Ported behavior target: docker_template_delete.py's `uninstallLikeWebUi`/
- * `deleteTemplate` -- stop if running, remove container, optionally remove
- * image (swallowing 409 ImageInUse) + prune volumes, LEAVE the
+ * Covers `deleteTemplate`: stop if running, remove container, optionally
+ * remove image (swallowing 409 ImageInUse) + prune volumes, LEAVE the
  * user-template XML in place so it resurfaces as a "Previous App". This
  * mutation is SYNCHRONOUS (schema: `Boolean!`, no streamed operation) --
- * unlike install/edit, matching the SDL in schema.graphql exactly.
+ * unlike install/edit.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';

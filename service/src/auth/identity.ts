@@ -36,8 +36,8 @@ export interface MeFallbackOptions {
   /** Local unraid-api GraphQL endpoint (tcp transport). Overridable for
    * tests/dev; when present, takes priority over the unix-socket default. */
   readonly localApiUrl?: string;
-  /** Local unraid-api unix socket path (production default transport,
-   * box-verified). Only used when localApiUrl is absent. */
+  /** Local unraid-api unix socket path (production default transport).
+   * Only used when localApiUrl is absent. */
   readonly localApiSocketPath?: string;
   /** Bounded timeout so a hung unraid-api never hangs auth resolution. */
   readonly timeoutMs?: number;
@@ -168,8 +168,7 @@ export async function resolveIdentityViaMeFallback(
         clearTimeout(timeout);
       }
     } else {
-      // Production default: POST over the local unraid-api unix socket
-      // (box-verified).
+      // Production default: POST over the local unraid-api unix socket.
       const socketPath = options.localApiSocketPath ?? resolveDefaultLocalApiSocketPath();
       response = await postOverUnixSocket(socketPath, '/graphql', body, presentedKey, timeoutMs);
     }
