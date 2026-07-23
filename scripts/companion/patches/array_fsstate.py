@@ -22,10 +22,9 @@ an already-patched bundle without a pristine restore.
 """
 from __future__ import annotations
 
-import glob
 import os
 
-from companion._bundle import INDEX_BUNDLE_GLOB, find_bundle
+from companion._bundle import find_bundle, find_bundle_with
 from companion._runtime import log
 
 FIELD_MARKER = "/* u-manager-companion: array fsState field */"
@@ -69,17 +68,10 @@ _VALUE_OVERLAY = "\n" + VALUE_MARKER + "\n" + r"""
 
 
 def patch_fsstate_field() -> bool:
-    """Register the `fsState` Field on the UnraidArray model (index bundle)."""
-    bundle = next(
-        (
-            p
-            for p in glob.glob(INDEX_BUNDLE_GLOB)
-            if _FIELD_ANCHOR in open(p).read()
-        ),
-        None,
-    )
+    """Register the `fsState` Field on the UnraidArray model."""
+    bundle = find_bundle_with(_FIELD_ANCHOR)
     if not bundle:
-        log("array-fsstate field: index bundle with UnraidArray not found")
+        log("array-fsstate field: UnraidArray model bundle not found")
         return False
     with open(bundle, "r") as f:
         content = f.read()
