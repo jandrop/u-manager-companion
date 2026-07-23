@@ -30,6 +30,11 @@
 # mutations sit at the ROOT Query/Mutation (not namespaced under a
 # `*Mutations` type) -- mirrors the app op catalogue, which selects these
 # fields directly off `query`/`mutation`, not through a namespace object.
+#
+# Slice 2 (plugins) additionally cross-references, for field/type parity:
+#   - queries/unraid_graphql_plugins_queries.dart (installedUnraidPluginsDetailedQuery)
+# `installedUnraidPluginsDetailed` also sits at the ROOT Query, same
+# un-namespaced convention as shares.
 
 "Upstream unraid-api's prefixed-ID scalar (e.g. \"docker:<hash>\"). updateContainerStream($id: PrefixedID!) selects this exact scalar name -- kept as a distinct scalar rather than aliasing to ID so an accidental bare-ID argument mismatch fails catalogue parity instead of silently type-checking."
 scalar PrefixedID
@@ -61,6 +66,9 @@ type Query {
 
   "True when /mnt/user/<name> contains no user-visible files. Used by the share editor to gate the Delete button (emhttpd refuses to remove a non-empty share). Mirrors shareIsEmptyQuery."
   shareIsEmpty(name: String!): Boolean!
+
+  "Installed Unraid OS plugins enriched with parsed .plg manifest metadata (name, author, version, description, changelog, cached update info). Mirrors installedUnraidPluginsDetailedQuery in unraid_graphql_plugins_queries.dart exactly."
+  installedUnraidPluginsDetailed: [InstalledPluginManifest!]!
 }
 
 type Mutation {
@@ -291,6 +299,38 @@ type Share {
   cow: String
   color: String
   luksStatus: Int
+}
+
+# ---------------------------------------------------------------------------
+# Plugins (Slice 2 -- companion-category-a-migration)
+# ---------------------------------------------------------------------------
+
+"Parsed manifest of an installed Unraid plugin (.plg file), read from /boot/config/plugins/. Field set mirrors installedUnraidPluginsDetailedQuery's selection in unraid_graphql_plugins_queries.dart exactly."
+type InstalledPluginManifest {
+  "Bare .plg filename in /boot/config/plugins."
+  filename: String!
+  "Plugin name slug from <!ENTITY name>. Falls back to the filename without .plg."
+  name: String!
+  "Plugin author from <!ENTITY author> (or the <PLUGIN author> attribute when the entity isn't declared)."
+  author: String
+  "Plugin version string from <!ENTITY version>."
+  version: String
+  "Free-text description read from the plugin's extracted README.md, not from the .plg manifest."
+  description: String
+  "Remote .plg URL from <!ENTITY pluginURL>."
+  pluginURL: String
+  "Support thread URL from <!ENTITY support> (or supportURL)."
+  support: String
+  "Icon path or URL from <!ENTITY icon>."
+  icon: String
+  "Launch path from <!ENTITY launch>."
+  launch: String
+  "Raw <CHANGES> body from the local .plg."
+  changelog: String
+  "Version from the cached remote .plg at /tmp/plugins/<filename>, if Unraid has run an update check."
+  latestVersion: String
+  "Timestamp of the cached remote .plg at /tmp/plugins/<filename> -- when Unraid last fetched it via plugin checkall. ISO 8601 string."
+  lastCheckedAt: String
 }
 
 # ---------------------------------------------------------------------------

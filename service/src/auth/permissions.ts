@@ -53,6 +53,11 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   power: { resource: 'SERVERS', action: 'update' },
   'plugins.uninstall': { resource: 'PLUGINS', action: 'update' },
   'plugins.checkForUpdates': { resource: 'PLUGINS', action: 'update' },
+  // Never actually checked -- installedUnraidPluginsDetailed is a read-only
+  // query, ungated in resolvers.ts (same posture as the shares reads). This
+  // entry exists only because OPERATION_PERMISSIONS is a total map over
+  // CapabilityKey.
+  'plugins.installedDetailed': { resource: 'PLUGINS', action: 'update' },
   shares: { resource: 'SHARE', action: 'update' },
 };
 

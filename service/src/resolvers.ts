@@ -37,6 +37,7 @@ import type { DockerInstallSubject } from './features/docker_template/install.js
 import type { DockerTemplateEditInput } from './features/docker_template/edit.js';
 import type { ParsedDockerTemplate, DockerConfigEntryTypeXml } from './features/docker_template/xml.js';
 import type { PluginInstallSubject } from './features/plugins/uninstall.js';
+import type { PluginManifestRecord } from './features/plugins/platform.js';
 import type {
   ShareAccessEntry,
   ShareRecord,
@@ -91,6 +92,7 @@ export interface FeatureModuleDeps {
   readonly getShareSecurity: (name: string) => Promise<ShareSecurity>;
   readonly getShareSecurityUsers: () => Promise<readonly ShareSecurityUser[]>;
   readonly getShareIsEmpty: (name: string) => Promise<boolean>;
+  readonly listInstalledPluginsDetailed: () => Promise<readonly PluginManifestRecord[]>;
   readonly createShare: (
     name: string,
     settings: ShareSettingsInput,
@@ -183,6 +185,28 @@ function toPluginInstallOperation(
     updatedAt: snapshot.updatedAt.toISOString(),
     finishedAt: snapshot.finishedAt ? snapshot.finishedAt.toISOString() : null,
     output: snapshot.output,
+  };
+}
+
+interface GraphqlInstalledPluginManifest {
+  readonly filename: string;
+  readonly name: string;
+  readonly author: string | null;
+  readonly version: string | null;
+  readonly description: string | null;
+  readonly pluginURL: string | null;
+  readonly support: string | null;
+  readonly icon: string | null;
+  readonly launch: string | null;
+  readonly changelog: string | null;
+  readonly latestVersion: string | null;
+  readonly lastCheckedAt: string | null;
+}
+
+function toGraphqlPluginManifest(record: PluginManifestRecord): GraphqlInstalledPluginManifest {
+  return {
+    ...record,
+    lastCheckedAt: record.lastCheckedAt ? record.lastCheckedAt.toISOString() : null,
   };
 }
 
@@ -345,6 +369,16 @@ export const resolvers = {
       context: GraphqlContext,
     ): Promise<boolean> {
       return context.deps.getShareIsEmpty(args.name);
+    },
+    // Read-only -- NOT permission-gated, same posture as the shares reads
+    // above.
+    async installedUnraidPluginsDetailed(
+      _parent: unknown,
+      _args: Record<string, never>,
+      context: GraphqlContext,
+    ): Promise<readonly GraphqlInstalledPluginManifest[]> {
+      const records = await context.deps.listInstalledPluginsDetailed();
+      return records.map(toGraphqlPluginManifest);
     },
   },
 

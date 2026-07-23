@@ -40,7 +40,7 @@ describe('schema.graphql', () => {
     );
   });
 
-  it('declares the v1 Query fields (dockerInstallOperation, dockerTemplate, capabilities) plus the Slice 1 root share queries', () => {
+  it('declares the v1 Query fields (dockerInstallOperation, dockerTemplate, capabilities) plus the Slice 1 root share queries and the Slice 2 plugins query', () => {
     const sdl = readFileSync(SDL_PATH, 'utf8');
     const schema = buildSchema(sdl);
     const queryType = schema.getQueryType();
@@ -55,6 +55,7 @@ describe('schema.graphql', () => {
         'shareSecurity',
         'shareSecurityUsers',
         'shareIsEmpty',
+        'installedUnraidPluginsDetailed',
       ].sort(),
     );
   });
@@ -98,6 +99,7 @@ describe('CAPABILITY_KEYS', () => {
         'power',
         'plugins.uninstall',
         'plugins.checkForUpdates',
+        'plugins.installedDetailed',
         'shares',
       ].sort(),
     );

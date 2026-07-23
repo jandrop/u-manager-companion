@@ -77,6 +77,8 @@ import { checkForDockerUpdates } from './features/docker_update/check-updates.js
 import { shutdownServer, rebootServer, sleepServer } from './features/power/power.js';
 import { uninstallPlugin } from './features/plugins/uninstall.js';
 import { checkForPluginUpdates } from './features/plugins/check-updates.js';
+import { listInstalledPluginsDetailed } from './features/plugins/list-installed-detailed.js';
+import { createPluginManifestClient } from './features/plugins/platform.js';
 import {
   createShare,
   deleteShare,
@@ -195,6 +197,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
   // createEmhttpdClient() with no args wires the default (native
   // shares.ini parse) getShares -- see platform.ts's module doc.
   const sharesClient = createEmhttpdClient();
+  const pluginManifestClient = createPluginManifestClient();
 
   return {
     installDockerTemplate: (input) =>
@@ -260,6 +263,8 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
       updateShareSecurity(name, settings, { client: sharesClient, audit, caller }),
     updateShareAccess: (name, access) =>
       updateShareAccess(name, access, { client: sharesClient, audit, caller }),
+    listInstalledPluginsDetailed: () =>
+      listInstalledPluginsDetailed({ client: pluginManifestClient }),
   };
 }
 

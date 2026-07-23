@@ -12,13 +12,14 @@
  * Scope: only the op documents the SDL actually covers (docker template
  * install/edit/delete, docker update streams + checkForUpdates,
  * serverPower shutdown/reboot/sleep, unraidPlugins uninstall/checkForUpdates,
- * dockerInstallOperation query, dockerInstallUpdates subscription, and --
- * as of Slice 1 (companion-category-a-migration) -- shares list/security/
+ * dockerInstallOperation query, dockerInstallUpdates subscription, --
+ * Slice 1 (companion-category-a-migration) -- shares list/security/
  * security-users/is-empty queries and createShare/updateShare/deleteShare/
- * updateShareSecurity/updateShareAccess mutations). The companion
- * catalogue also carries network/array/metrics/plugins-detailed ops that
- * remain OUT of schema scope until their own migration slices land --
- * parity for those is not this gate's job yet.
+ * updateShareSecurity/updateShareAccess mutations, and -- Slice 2 -- the
+ * installedUnraidPluginsDetailed query). The companion catalogue also
+ * carries network/array/metrics ops that remain OUT of schema scope until
+ * their own migration slices land -- parity for those is not this gate's
+ * job yet.
  *
  * TDD: written before the extraction helper exists -> RED first.
  */
@@ -67,6 +68,7 @@ const V1_CATALOGUE_FILES = [
   'mutations/unraid_graphql_shares_mutations.dart',
   'queries/unraid_graphql_docker_template_queries.dart',
   'queries/unraid_graphql_shares_queries.dart',
+  'queries/unraid_graphql_plugins_queries.dart',
   'subscriptions/unraid_graphql_docker_template_subscriptions.dart',
 ] as const;
 
