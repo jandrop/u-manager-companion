@@ -15,6 +15,7 @@ PUBSUB_FILE = (
 )
 BUNDLE_GLOB = "/usr/local/unraid-api/dist/assets/plugin.module-*.js"
 INDEX_BUNDLE_GLOB = "/usr/local/unraid-api/dist/assets/index-*.js"
+ASSETS_GLOB = "/usr/local/unraid-api/dist/assets/*.js"
 
 
 def find_bundle() -> Optional[str]:
@@ -23,6 +24,20 @@ def find_bundle() -> Optional[str]:
             content = f.read()
         if "class MetricsResolver" in content and "class InfoNetwork extends Node" in content:
             return path
+    return None
+
+
+def find_bundle_with(anchor: str) -> Optional[str]:
+    """Return the first dist asset whose content contains ``anchor``.
+
+    Chunk file names change between API builds, and a class can move from
+    one chunk to another (e.g. the model classes left ``index-*.js`` in a
+    later build), so match on content instead of a fixed file name.
+    """
+    for path in glob.glob(ASSETS_GLOB):
+        with open(path, "r") as f:
+            if anchor in f.read():
+                return path
     return None
 
 

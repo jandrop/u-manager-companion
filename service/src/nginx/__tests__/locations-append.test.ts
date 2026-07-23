@@ -1,6 +1,6 @@
 /**
  * Idempotent append-if-missing tests for the include line appended to
- * locations.conf (NOT a wildcard conf.d drop -- box-verified on the box).
+ * locations.conf (NOT a wildcard conf.d drop).
  *
  * TDD: written before locations-append.ts exists -> RED first.
  */

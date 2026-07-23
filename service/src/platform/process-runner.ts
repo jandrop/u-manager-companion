@@ -1,17 +1,15 @@
 /**
  * Thin, injectable wrappers over `execa`. Feature modules depend on
  * `StreamedProcessRunner` / `DetachedProcessRunner` FUNCTION TYPES, never on
- * `execa` directly, so tests never actually shell out. Two shapes, matching
- * the two process patterns the ported Python patches use:
+ * `execa` directly, so tests never actually shell out. Two shapes, covering
+ * the two process patterns feature modules need:
  *
  *   - streamed: `rebuild_container`, `plugin remove` -- merged
  *     stdout/stderr captured line-by-line via a callback, resolves with the
- *     exit code once the child exits. Mirrors
- *     docker_template_create.py's `rebuildContainer()` all-stream handling.
+ *     exit code once the child exits.
  *   - detached: `/sbin/poweroff`, `/sbin/reboot`, `rc.s3sleep` -- fire and
  *     forget, `detached: true` + `unref()` so the parent process exiting
- *     (shutdown/reboot) never blocks on the child. Mirrors power.py's
- *     `fireAndForget()`.
+ *     (shutdown/reboot) never blocks on the child.
  */
 import { execa } from 'execa';
 
@@ -34,12 +32,10 @@ export type StreamedProcessRunner = (
 /**
  * Production StreamedProcessRunner: shells to `command` via execa with
  * merged stdout/stderr (`all: true`), buffering partial lines across chunk
- * boundaries the same way the ported Python patches' `onChunk` closures do.
- * `reject: false` so a non-zero exit surfaces as a normal
- * StreamedProcessResult instead of a thrown ExecaError -- callers branch on
- * `exitCode`, matching the reference implementation's
- * `if (result.exitCode !== 0) throw ...` pattern at the call site instead
- * of here.
+ * boundaries via an `onChunk` closure. `reject: false` so a non-zero exit
+ * surfaces as a normal StreamedProcessResult instead of a thrown
+ * ExecaError -- callers branch on `exitCode` and throw at the call site
+ * instead of here.
  */
 export const runStreamedProcess: StreamedProcessRunner = async (command, args, onLine) => {
   const child = execa(command, args, { all: true, reject: false, shell: true });

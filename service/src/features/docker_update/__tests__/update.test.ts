@@ -3,22 +3,20 @@
  *
  * TDD: written before update.ts exists -> RED first.
  *
- * Ported behavior target: docker_update_stream.py's `updateOne()`/
- * `startOne()`/`startAll()` pipeline -- pull, stop-if-running, remove,
+ * Covers the update pipeline: pull, stop-if-running, remove,
  * rebuild_container, restart-if-was-running-and-not-auto-restarted,
  * best-effort orphan-image removal. Update-all reads updatable targets and
  * runs the per-container pipeline sequentially under ONE operation,
  * aggregating output. Concurrency: refuses to start a new update while one
- * is in flight (module-level `busy` flag, ported verbatim). Both mutations
- * are audited on start.
+ * is in flight (module-level `busy` flag). Both mutations are audited on
+ * start.
  *
- * The reference `syncUpdateStatusForRepo()` (rewriting
- * unraid-update-status.json + docker.json webui-info cache) IS ported --
- * without it the update pipeline recreates the container but never
- * refreshes Unraid's on-disk update-status caches, so the "update
- * available" badge persists in the app even after a successful update.
- * Runs after a successful rebuild, for both single update and update-all
- * (wired inside `updateOne`).
+ * `syncUpdateStatusForRepo()` rewrites unraid-update-status.json and the
+ * docker.json webui-info cache -- without it the update pipeline
+ * recreates the container but never refreshes Unraid's on-disk
+ * update-status caches, so the "update available" badge persists in the
+ * app even after a successful update. Runs after a successful rebuild,
+ * for both single update and update-all (wired inside `updateOne`).
  */
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -2,15 +2,24 @@
  * Operation -> required action+resource permission map, and the
  * authorization check against a resolved identity.
  *
- * Mapping mirrors the permission gates already encoded in the legacy
- * patches:
+ * Permission gates by area:
  *   - docker template install/edit/delete, docker update streams -> DOCKER (update)
  *   - power shutdown/reboot/sleep -> SERVERS (update)
  *   - plugin uninstall/update-check -> PLUGINS (update)
+ *   - shares mutations (create/update/delete/security/access) -> SHARE (update)
+ *     (Unraid's own permission model splits share access into separate
+ *     CREATE_ANY/UPDATE_ANY/DELETE_ANY grants on Resource.SHARE; this service
+ *     collapses that to a single 'shares' capability key gated on
+ *     SHARE:update -- v1 has no per-CRUD-verb permission granularity, matching
+ *     every other v1 capability's single update-gate posture)
  *
  * Operation keys reuse CAPABILITY_KEYS naming (schema/version.ts) so the
  * same string identifies a capability AND a permission-checked
- * operation -- one vocabulary, not two.
+ * operation -- one vocabulary, not two. Read-only share queries
+ * (shares/shareSecurity/shareSecurityUsers/shareIsEmpty) are NOT
+ * permission-gated in resolvers.ts -- same posture as `capabilities`
+ * itself: any authenticated identity satisfies a read-only gate once past
+ * auth, so these queries don't need per-permission checks.
  */
 import type { CapabilityKey } from '../schema/version.js';
 import type { Authority, ResolvedIdentity } from './keystore.js';
@@ -21,7 +30,7 @@ import type { Authority, ResolvedIdentity } from './keystore.js';
  * here. */
 export type CompanionOperation = CapabilityKey;
 
-export type PermissionResource = 'DOCKER' | 'SERVERS' | 'PLUGINS';
+export type PermissionResource = 'DOCKER' | 'SERVERS' | 'PLUGINS' | 'SHARE';
 export type PermissionAction = 'update';
 
 export interface RequiredPermission {
@@ -44,6 +53,12 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   power: { resource: 'SERVERS', action: 'update' },
   'plugins.uninstall': { resource: 'PLUGINS', action: 'update' },
   'plugins.checkForUpdates': { resource: 'PLUGINS', action: 'update' },
+  // Never actually checked -- installedUnraidPluginsDetailed is a read-only
+  // query, ungated in resolvers.ts (same posture as the shares reads). This
+  // entry exists only because OPERATION_PERMISSIONS is a total map over
+  // CapabilityKey.
+  'plugins.installedDetailed': { resource: 'PLUGINS', action: 'update' },
+  shares: { resource: 'SHARE', action: 'update' },
 };
 
 function permissionKey(permission: RequiredPermission): string {

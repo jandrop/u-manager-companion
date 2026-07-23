@@ -1,12 +1,9 @@
 /**
  * operations/registry.ts tests.
  *
- * Direct port target: docker_template_create.py's IIFE state machine
- * (`u-manager-companion/scripts/companion/patches/docker_template_create.py`,
- * PATCH_MARKER "docker-install-stream-v2"). These tests pin the same
- * semantics: status transitions, delta-only event emission, ring-buffer cap
- * at 500 lines (drop-oldest), TTL cleanup via an unref'd timer, and
- * snapshot-after-cleanup returning null.
+ * Pins the streaming-operation semantics: status transitions, delta-only
+ * event emission, ring-buffer cap at 500 lines (drop-oldest), TTL cleanup
+ * via an unref'd timer, and snapshot-after-cleanup returning null.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pubsub, channelFor } from '../../pubsub';

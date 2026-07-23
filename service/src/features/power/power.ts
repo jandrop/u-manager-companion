@@ -1,15 +1,14 @@
 /**
  * Server power mutations.
  *
- * Ported from `power.py` PHASE B (ServerService methods): shutdown ->
- * `/sbin/poweroff`, reboot -> `/sbin/reboot`, both fire-and-forget detached
- * processes -- no `powerdown` wrapper script dependency, matching the
- * reference's own rationale (mirrors what the web UI's Powerdown.php does
- * directly). sleep -> guarded on the Dynamix S3 Sleep plugin's
- * `rc.s3sleep` script existing; throws the SAME user-facing message as the
- * reference when it's missing, WITHOUT firing the detached call or
- * recording an audit entry (a rejected sleep request from a missing
- * capability is not a privileged action that happened).
+ * shutdown -> `/sbin/poweroff`, reboot -> `/sbin/reboot`, both
+ * fire-and-forget detached processes -- no `powerdown` wrapper script
+ * dependency (mirrors what the web UI's Powerdown.php does directly).
+ * sleep -> guarded on the Dynamix S3 Sleep plugin's `rc.s3sleep` script
+ * existing; throws a clear user-facing message when it's missing, WITHOUT
+ * firing the detached call or recording an audit entry (a rejected sleep
+ * request from a missing capability is not a privileged action that
+ * happened).
  *
  * CRITICAL ordering invariant: audit entry recorded BEFORE the detached
  * call fires, because the log must survive process death. Every exported

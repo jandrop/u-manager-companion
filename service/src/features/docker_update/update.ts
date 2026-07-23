@@ -1,29 +1,25 @@
 /**
  * updateContainerStream + updateAllContainersStream.
  *
- * Ported from `docker_update_stream.py`'s IIFE `updateOne()`/`startOne()`/
- * `startAll()`/`runUpdateAll()`. Per-container pipeline: pull image,
- * stop-if-running, remove, `rebuild_container`, restart ONLY if the
- * container was running before AND rebuild_container did not already
- * auto-restart it (mirrors the reference's post-rebuild inspect diff),
- * best-effort orphan-image removal. Update-all resolves updatable targets
- * via an injected lookup (production wiring reads
- * `/var/lib/docker/unraid-update-status.json` + matches against running
- * containers, same as the reference) and runs the per-container pipeline
- * SEQUENTIALLY under one operation, aggregating output across every
- * target. Concurrency: a module-level `busy` flag refuses to start a new
- * update while one is in flight -- ported verbatim from the reference's
- * `busy` guard (install/edit ops are independent and NOT gated by this;
- * only update ops share this serialization, matching design/reference
- * scope exactly).
+ * Per-container pipeline: pull image, stop-if-running, remove,
+ * `rebuild_container`, restart ONLY if the container was running before
+ * AND rebuild_container did not already auto-restart it (checked via a
+ * post-rebuild inspect diff), best-effort orphan-image removal.
+ * Update-all resolves updatable targets via an injected lookup
+ * (production wiring reads `/var/lib/docker/unraid-update-status.json`
+ * and matches against running containers) and runs the per-container
+ * pipeline SEQUENTIALLY under one operation, aggregating output across
+ * every target. Concurrency: a module-level `busy` flag refuses to start
+ * a new update while one is in flight (install/edit ops are independent
+ * and NOT gated by this; only update ops share this serialization).
  *
- * `syncUpdateStatusForRepo()` (rewriting unraid-update-status.json /
- * docker.json webui-info cache) IS ported -- without it the update
- * pipeline recreates the container but leaves Unraid's on-disk
- * update-status caches stale, so the "update available" badge never
- * clears even though the container was updated. Runs after a successful
- * rebuild for both single-container and update-all (called from inside
- * `updateOne`, so update-all gets it for free per target).
+ * `syncUpdateStatusForRepo()` rewrites unraid-update-status.json and the
+ * docker.json webui-info cache -- without it the update pipeline
+ * recreates the container but leaves Unraid's on-disk update-status
+ * caches stale, so the "update available" badge never clears even though
+ * the container was updated. Runs after a successful rebuild for both
+ * single-container and update-all (called from inside `updateOne`, so
+ * update-all gets it for free per target).
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import {
@@ -43,9 +39,8 @@ export const DOCKER_INSTALL_CHANNEL_PREFIX = 'DOCKER_INSTALL';
 
 /** Injectable resolver for "every container with an available update".
  * Production wiring reads `/var/lib/docker/unraid-update-status.json`
- * (local!=remote digest pairs) and cross-references running containers,
- * per the reference's `readUpdatableTargets()`; tests inject a fake list
- * directly. */
+ * (local!=remote digest pairs) and cross-references running containers;
+ * tests inject a fake list directly. */
 export type ListUpdatableContainerNames = () => Promise<readonly string[]>;
 
 export interface DockerUpdateDeps {
@@ -69,8 +64,8 @@ export interface DockerUpdateAllDeps extends DockerUpdateDeps {
   readonly listUpdatableContainerNames: ListUpdatableContainerNames;
 }
 
-// Ported verbatim from the reference's module-level `busy` flag -- update
-// ops (single or all) refuse to overlap; install/edit ops are unaffected.
+// Module-level busy flag: update ops (single or all) refuse to overlap;
+// install/edit ops are unaffected.
 let busy = false;
 
 /** Test-only reset -- each test file gets a clean module under vitest's
@@ -182,8 +177,8 @@ interface UpdateStatusEntry {
 }
 
 /** Reads a JSON cache file, tolerating a missing/malformed file by falling
- * back to `{}` -- matches the reference's own best-effort read (a cache
- * file that doesn't exist yet just means "nothing cached"). */
+ * back to `{}` -- a cache file that doesn't exist yet just means "nothing
+ * cached". */
 async function readJsonObjectOrEmpty(filePath: string): Promise<Record<string, unknown>> {
   try {
     const raw = await readFile(filePath, 'utf8');
@@ -200,9 +195,8 @@ async function writeJsonObject(filePath: string, value: Record<string, unknown>)
 
 /**
  * Refreshes Unraid's on-disk update-status caches for one repository/
- * container pair after a successful update -- ported from the reference
- * `docker_update_stream.py`'s `syncUpdateStatusForRepo()`. Without this the
- * update pipeline recreates the container but the "update available" badge
+ * container pair after a successful update. Without this the update
+ * pipeline recreates the container but the "update available" badge
  * never clears, because both caches below are read/short-circuited
  * independently of whether the container was actually rebuilt.
  *

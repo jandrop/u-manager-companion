@@ -18,9 +18,32 @@
 # binding these fields to server.ts and the feature modules lives
 # separately -- only the capabilities resolver (health.ts) exists at this
 # stage.
+#
+# Slice 1 (shares) additionally cross-references, for field/type/arg
+# parity:
+#   - queries/unraid_graphql_shares_queries.dart (sharesQuery, shareSecurityQuery,
+#     shareSecurityUsersQuery, shareIsEmptyQuery)
+#   - mutations/unraid_graphql_shares_mutations.dart (createShareMutation,
+#     updateShareMutation, deleteShareMutation, updateShareSecurityMutation,
+#     updateShareAccessMutation)
+# `shares`/`shareSecurity`/`shareSecurityUsers`/`shareIsEmpty`/the share
+# mutations sit at the ROOT Query/Mutation (not namespaced under a
+# `*Mutations` type) -- mirrors the app op catalogue, which selects these
+# fields directly off `query`/`mutation`, not through a namespace object.
+#
+# Slice 2 (plugins) additionally cross-references, for field/type parity:
+#   - queries/unraid_graphql_plugins_queries.dart (installedUnraidPluginsDetailedQuery)
+# `installedUnraidPluginsDetailed` also sits at the ROOT Query, same
+# un-namespaced convention as shares.
 
 "Upstream unraid-api's prefixed-ID scalar (e.g. \"docker:<hash>\"). updateContainerStream($id: PrefixedID!) selects this exact scalar name -- kept as a distinct scalar rather than aliasing to ID so an accidental bare-ID argument mismatch fails catalogue parity instead of silently type-checking."
 scalar PrefixedID
+
+"Untyped JSON scalar, used by the `settings`/`access` mutation arguments and the `shareSecurity`/`shareSecurityUsers` query return types -- the client deserialises the raw JSON payload itself, matching sharesQuery's companion op shapes exactly."
+scalar JSON
+
+"64-bit integer scalar for byte-sized fields. Mirrors upstream unraid-api's `Share.free/used/size: BigInt` -- real share sizes exceed GraphQL's 32-bit `Int` range. Identity passthrough (like `JSON`/`PrefixedID`): the resolver returns a JS number and the client's DTO reads it as a 64-bit int."
+scalar BigInt
 
 type Query {
   "Snapshot fetch for a tracked docker install/edit/update operation. Returns null once the operation TTL (15 min post-completion) has expired."
@@ -31,12 +54,42 @@ type Query {
 
   "Service self-description: schema version + serviceVersion + served capability keys. Primary signal for CompanionStatusCubit detection."
   capabilities: CompanionCapabilities!
+
+  "List of user shares, including the useCache/cachePool/cachePool2 extra fields. Mirrors sharesQuery (companion) in unraid_graphql_shares_queries.dart exactly."
+  shares: [Share!]!
+
+  "Current SMB security state for a user share (export/security/caseSensitive/readList/writeList/volsizelimit), read from sec.ini. Returned as a raw JSON scalar -- the client deserialises it, matching shareSecurityQuery."
+  shareSecurity(name: String!): JSON
+
+  "List of Unraid users available for share access control ({id, name, description, isRoot}), read from users.ini. Returned as a raw JSON scalar, matching shareSecurityUsersQuery."
+  shareSecurityUsers: JSON
+
+  "True when /mnt/user/<name> contains no user-visible files. Used by the share editor to gate the Delete button (emhttpd refuses to remove a non-empty share). Mirrors shareIsEmptyQuery."
+  shareIsEmpty(name: String!): Boolean!
+
+  "Installed Unraid OS plugins enriched with parsed .plg manifest metadata (name, author, version, description, changelog, cached update info). Mirrors installedUnraidPluginsDetailedQuery in unraid_graphql_plugins_queries.dart exactly."
+  installedUnraidPluginsDetailed: [InstalledPluginManifest!]!
 }
 
 type Mutation {
   docker: DockerMutations!
   serverPower: ServerPowerMutations!
   unraidPlugins: UnraidPluginsMutations!
+
+  "Creates a new user share. `settings` carries optional keys (comment, cachePool, cachePool2, useCache, cow, floor, allocator, splitLevel, include[], exclude[]) -- omitted keys fall back to emhttpd's defaults. Mirrors createShareMutation."
+  createShare(name: String!, settings: JSON): Share
+
+  "Updates an existing user share. Omitted keys in `settings` keep their current value (server-side merge). Mirrors updateShareMutation."
+  updateShare(name: String!, settings: JSON): Share
+
+  "Deletes a user share by name. The share directory must be empty. Mirrors deleteShareMutation."
+  deleteShare(name: String!): Boolean!
+
+  "Updates a share's SMB general security settings (export, security mode, case-sensitive, Time Machine size). Mirrors updateShareSecurityMutation."
+  updateShareSecurity(name: String!, settings: JSON): Boolean!
+
+  "Updates per-user share access. `access` is a list of {userId, access} entries (access: read-write/read-only/no-access). Mirrors updateShareAccessMutation."
+  updateShareAccess(name: String!, access: JSON!): Boolean!
 }
 
 type Subscription {
@@ -216,6 +269,68 @@ input DockerTemplateInput {
   cpuset: String
   fixedMac: String
   configs: [DockerTemplateConfigInput!]!
+}
+
+# ---------------------------------------------------------------------------
+# Shares (Slice 1 -- companion-category-a-migration)
+# ---------------------------------------------------------------------------
+
+"User share, as read from shares.ini. Field set mirrors sharesQuery's selection in unraid_graphql_shares_queries.dart exactly, including the useCache/cachePool/cachePool2 extra fields the share editor needs to pre-populate its dropdowns (the stock unraid-api Share type ships only a derived `cache: Boolean`, not these three raw .cfg-backed values). Numeric fields (free/used/size) are int-valued, and include/exclude are each a single delimited string rather than a list."
+type Share {
+  id: ID!
+  name: String!
+  free: BigInt
+  used: BigInt
+  size: BigInt
+  include: String
+  exclude: String
+  cache: Boolean
+  "Raw cache usage mode written to the share .cfg (\"\", \"no\", \"yes\", \"prefer\", \"only\")."
+  useCache: String
+  "Primary storage pool name (e.g. \"cache\"). Empty when the share lives on the array."
+  cachePool: String
+  "Secondary storage pool name. Empty when no secondary pool is configured."
+  cachePool2: String
+  nameOrig: String
+  comment: String
+  allocator: String
+  splitLevel: String
+  floor: String
+  cow: String
+  color: String
+  luksStatus: Int
+}
+
+# ---------------------------------------------------------------------------
+# Plugins (Slice 2 -- companion-category-a-migration)
+# ---------------------------------------------------------------------------
+
+"Parsed manifest of an installed Unraid plugin (.plg file), read from /boot/config/plugins/. Field set mirrors installedUnraidPluginsDetailedQuery's selection in unraid_graphql_plugins_queries.dart exactly."
+type InstalledPluginManifest {
+  "Bare .plg filename in /boot/config/plugins."
+  filename: String!
+  "Plugin name slug from <!ENTITY name>. Falls back to the filename without .plg."
+  name: String!
+  "Plugin author from <!ENTITY author> (or the <PLUGIN author> attribute when the entity isn't declared)."
+  author: String
+  "Plugin version string from <!ENTITY version>."
+  version: String
+  "Free-text description read from the plugin's extracted README.md, not from the .plg manifest."
+  description: String
+  "Remote .plg URL from <!ENTITY pluginURL>."
+  pluginURL: String
+  "Support thread URL from <!ENTITY support> (or supportURL)."
+  support: String
+  "Icon path or URL from <!ENTITY icon>."
+  icon: String
+  "Launch path from <!ENTITY launch>."
+  launch: String
+  "Raw <CHANGES> body from the local .plg."
+  changelog: String
+  "Version from the cached remote .plg at /tmp/plugins/<filename>, if Unraid has run an update check."
+  latestVersion: String
+  "Timestamp of the cached remote .plg at /tmp/plugins/<filename> -- when Unraid last fetched it via plugin checkall. ISO 8601 string."
+  lastCheckedAt: String
 }
 
 # ---------------------------------------------------------------------------

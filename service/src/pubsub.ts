@@ -9,10 +9,9 @@
  * One process-lifetime `PubSub` instance is shared by every operation --
  * channel names are namespaced per-operation (see `channelFor`) so
  * concurrent operations never cross-deliver events to each other's
- * subscribers. This mirrors the channel-per-operation model in the
- * reference bundle patch (docker_template_create.py's
- * `CHANNEL_PREFIX + id`), just typed and reusable across feature modules
- * instead of hardcoded to a single Docker-install channel prefix.
+ * subscribers. This channel-per-operation model is typed and reusable
+ * across feature modules rather than hardcoded to a single channel
+ * prefix.
  */
 import { PubSub } from 'graphql-subscriptions';
 

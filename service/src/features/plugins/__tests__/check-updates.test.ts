@@ -3,12 +3,11 @@
  *
  * TDD: written before check-updates.ts exists -> RED first.
  *
- * Ported behavior target: plugin_check.py -- fires `plugin checkall`
- * DETACHED (fire-and-forget, matching the reference's execa
- * `{detached: true, stdio: 'ignore'}` + unref) and returns true
- * immediately WITHOUT waiting for the check to finish -- the reference's
- * comment is explicit: "the boolean does not indicate check outcome; the
- * client polls the list afterwards." NOT audited, since the read-only
+ * Covers `checkForPluginUpdates`: fires `plugin checkall` DETACHED
+ * (fire-and-forget, via execa `{detached: true, stdio: 'ignore'}` + unref)
+ * and returns true immediately WITHOUT waiting for the check to finish --
+ * the returned boolean does not indicate the check's outcome; the client
+ * polls the list afterwards. NOT audited, since the read-only
  * update-check is not privileged -- this is the one privileged-adjacent
  * action in the whole feature surface that deliberately produces NO audit
  * record, so the test suite asserts a negative here as much as a

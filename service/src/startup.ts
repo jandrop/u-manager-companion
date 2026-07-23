@@ -120,8 +120,8 @@ async function ensureIncludeAndReload(config: CompanionConfig, runNginx: RunNgin
 /**
  * Runs the full nginx startup sequence (crash-recovery -> ensure-include +
  * validated reload -> self-heal monitor start) when nginx integration is
- * enabled, or returns a no-op monitor handle when it's disabled (task 7.2's
- * "no nginx" mode).
+ * enabled, or returns a no-op monitor handle when it's disabled ("no nginx"
+ * mode).
  */
 export async function runNginxStartupSequence(
   config: CompanionConfig,

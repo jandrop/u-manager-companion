@@ -13,8 +13,8 @@
  *   2. Write atomically. Temp file in the SAME DIRECTORY as includePath,
  *      then rename(2) over includePath. Same-filesystem rename is atomic --
  *      includePath is never observed as a partial write.
- *   3. Test. `nginx -t` against the real tree (includePath is now the
- *      candidate, byte-for-byte, because of step 2's atomic rename).
+ *   3. Test. `nginx -t` against the real tree (includePath is now exactly
+ *      the file that was just written, thanks to step 2's atomic rename).
  *   4. On PASS: `nginx -s reload`.
  *   5. On FAIL: restore the backup over includePath (same atomic swap), or
  *      remove the candidate if there was no prior include. Do NOT reload.

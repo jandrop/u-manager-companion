@@ -2,9 +2,7 @@
  * Thin, injectable wrapper over `dockerode`. Feature modules depend on the
  * `DockerClient` INTERFACE below, never on `dockerode` directly -- tests
  * inject a fake implementation so no suite ever needs a real docker socket.
- * Mirrors only the small surface the
- * ported Python patches actually use (`getDockerClient()` calls in
- * docker_template_create.py / docker_update_stream.py / etc.): pull with
+ * Covers only the small surface feature modules actually use: pull with
  * progress events, container start/stop/remove/inspect, image
  * inspect/remove, volume prune, list containers. Deliberately NOT a
  * full re-export of dockerode's API surface.
@@ -12,8 +10,8 @@
 import Docker from 'dockerode';
 
 /** One decoded event from dockerode's `followProgress` progress callback --
- * mirrors the shape the Python patches' `formatPullEvent()` consumes
- * (`event.status`, `event.id`, `event.error`, `event.progressDetail`). */
+ * carries `event.status`, `event.id`, `event.error`, and
+ * `event.progressDetail` for rendering pull progress to the caller. */
 export interface DockerPullProgressEvent {
   readonly status?: string;
   readonly id?: string;
@@ -55,8 +53,8 @@ export interface DockerContainerListEntry {
 }
 
 /** Docker API errors carry a `statusCode` (e.g. 304 already-started, 404
- * not-found) that the ported logic branches on -- narrow, structural check
- * rather than importing dockerode's error classes. */
+ * not-found) that callers branch on -- narrow, structural check rather
+ * than importing dockerode's error classes. */
 export interface DockerApiError {
   readonly statusCode?: number;
 }
@@ -70,8 +68,7 @@ export interface DockerClient {
   getImage(nameOrId: string): DockerImageHandle;
   /** Pulls `repoTag`, invoking `onProgress` for every decoded progress
    * event, and resolves once the pull completes (or rejects on failure).
-   * Wraps dockerode's `pull()` + `modem.followProgress()` pair -- the exact
-   * two-step the ported Python patches use. */
+   * Wraps dockerode's `pull()` + `modem.followProgress()` pair. */
   pull(repoTag: string, onProgress: (event: DockerPullProgressEvent) => void): Promise<void>;
   pruneVolumes(): Promise<void>;
   listContainers(options?: { readonly all?: boolean }): Promise<readonly DockerContainerListEntry[]>;

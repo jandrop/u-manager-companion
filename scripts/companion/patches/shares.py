@@ -21,8 +21,8 @@ import re
 
 from companion._bundle import (
     BUNDLE_GLOB,
-    INDEX_BUNDLE_GLOB,
     find_bundle,
+    find_bundle_with,
     find_decorator_suffix,
     find_metadata_suffix,
 )
@@ -54,15 +54,7 @@ def patch_share_extra_fields_bundle() -> bool:
     Tracked upstream: PR pending on the unraid-api fork
     (fix/share-mutations).
     """
-    candidates = glob.glob(INDEX_BUNDLE_GLOB)
-    bundle = next(
-        (
-            p
-            for p in candidates
-            if "], Share.prototype, \"luksStatus\", void 0);" in open(p).read()
-        ),
-        None,
-    )
+    bundle = find_bundle_with('], Share.prototype, "luksStatus", void 0);')
     if not bundle:
         log("share-extra-fields patch: index bundle with Share class not found")
         return False
@@ -155,15 +147,7 @@ def patch_array_disk_share_enabled_bundle() -> bool:
     Tracked upstream: PR pending on the unraid-api fork
     (fix/share-mutations).
     """
-    candidates = glob.glob(INDEX_BUNDLE_GLOB)
-    bundle = next(
-        (
-            p
-            for p in candidates
-            if '], ArrayDisk.prototype, "isSpinning", void 0);' in open(p).read()
-        ),
-        None,
-    )
+    bundle = find_bundle_with('], ArrayDisk.prototype, "isSpinning", void 0);')
     if not bundle:
         log("array-disk-share-enabled: index bundle with ArrayDisk not found")
         return False
