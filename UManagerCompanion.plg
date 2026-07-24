@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.07.23.1">
+<!ENTITY version "2026.07.24.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,10 @@
 
 <CHANGES>
 <![CDATA[
+###2026.07.24.1
+- Fixed the companion not appearing on Unraid's Plugins page after installing
+  it from the U-Manager app.
+
 ###2026.07.23.1
 - Fixed the extra details the companion adds (array Starting/Stopping status,
   share and disk info) breaking after a recent Unraid Connect update. They
