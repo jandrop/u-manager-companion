@@ -422,6 +422,12 @@ bash &plgdir;/apply.sh
 # repo.
 setsid -f bash &plgdir;/service-supervisor.sh >/dev/null 2>/dev/null
 
+# Self-register so the WebGUI plugins page lists it. `plugin install` creates
+# this symlink itself, but when the install runs through unraid-api's
+# installPlugin, the unraid-api restart can kill it before that step, leaving
+# the plugin working but absent from the plugins page. Idempotent via -f.
+ln -sf /boot/config/plugins/UManagerCompanion.plg /var/log/plugins/UManagerCompanion.plg
+
 echo ""
 echo " &displayName; installed."
 echo "--------------------------------------------"
