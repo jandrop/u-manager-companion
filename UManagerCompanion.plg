@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.07.26.1">
+<!ENTITY version "2026.07.26.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.07.26.2
+- Fixed the Unraid API becoming unresponsive when short-lived containers
+  without a template are running (for example GitLab CI runners), which
+  stopped the app and other tools from connecting.
+
 ###2026.07.26.1
 - Fixed the paused parity check not showing in the app.
 
@@ -327,7 +332,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <!-- Placeholder in the source repo; CI computes and injects the real SHA at
      release time (see .github/workflows/release.yml), same as the service
      bundle below. Keeps the committed .plg SHA-clean. -->
-<SHA256>c3a0920130bec1aa6bafc0e61779d3ae3732fb52192cbfb09e3ca0fb7f325bdb</SHA256>
+<SHA256>0000000000000000000000000000000000000000000000000000000000000000</SHA256>
 </FILE>
 
 <!-- The standalone GraphQL service bundle (esbuild-produced single-file CJS,
@@ -349,7 +354,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <URL>https://github.com/&github;/releases/download/&version;/companion-service-&version;.cjs</URL>
 <!-- PLACEHOLDER: real hash computed by scripts/build.sh once the service
      build output is included in the release pipeline. -->
-<SHA256>3459ede18aca9cb6a748b0e6fca9eaf41f5aa8f32db784769cfe9d79dbd50189</SHA256>
+<SHA256>0000000000000000000000000000000000000000000000000000000000000000</SHA256>
 </FILE>
 
 <!-- Runs on install AND on every boot (Unraid replays plg install on boot).
