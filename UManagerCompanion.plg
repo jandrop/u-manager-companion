@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.07.26.2">
+<!ENTITY version "2026.07.30.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,13 @@
 
 <CHANGES>
 <![CDATA[
+###2026.07.30.1
+- Fixed the Unraid API still becoming unresponsive with CI runners. The
+  previous fix only helped while the same containers stayed up; it now also
+  covers runners that start and stop containers on every job.
+- Fixed the Remove Plugin window never finishing when uninstalling the
+  companion. The plugin was removed correctly, only the window stayed open.
+
 ###2026.07.26.2
 - Fixed the Unraid API becoming unresponsive when short-lived containers
   without a template are running (for example GitLab CI runners), which
