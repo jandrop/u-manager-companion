@@ -1,27 +1,26 @@
-"""DockerTemplateScannerService: stop the runaway template-sync loop.
+"""Stop DockerTemplateScannerService rescanning containers that can never match.
 
-`DockerTemplateScannerService.syncMissingContainers(containers)` looks for
-containers whose name is not in `templateMappings` (and not in
-`skipTemplatePaths`) and, if any are found, logs `Found N containers without
-template mappings, triggering sync` and calls `scanTemplates()`. But
-`scanTemplates()` can only map a container that has a matching template XML.
-A container that will never have one -- e.g. a GitLab CI runner's ephemeral
-`runner-<id>-...-build` container -- stays unmapped forever, so every call
-re-detects it and re-triggers a full scan. On a box where something polls the
-container list often (or Docker events fire), this becomes a tight loop that
-pegs the unraid-api's single Node thread and blocks the GraphQL event loop, so
-the whole API stops responding.
+`syncMissingContainers()` runs a full `scanTemplates()` whenever a container is
+missing from `templateMappings`. A scan reads every template XML off the flash
+and rewrites docker.config.json with fsync, on Node's 4 libuv workers. So a
+container that never matches -- a GitLab CI runner's throwaway container --
+turns every docker query into flash I/O and the API stops answering while it
+runs. It never crashes, so `unraid-api status` stays green throughout.
 
-This patch wraps `syncMissingContainers` with a dedupe guard: it only lets the
-original run when the *set of unmappable container names* has changed since the
-last scan. A persistently-unmappable container therefore triggers at most one
-scan (not one per call), while a genuinely new app (new unmapped name) still
-triggers a scan exactly once. Rescanning the same unmappable set is pointless
-anyway -- it cannot conjure a template that does not exist.
+v1 deduped on the set of unmapped names. CI containers come and go, the set
+oscillates 1 <-> 2, the key never repeats and the guard never fires.
+Measured over 20 queries: 11 scans unpatched, 10 with v1, 0 with v2.
 
-Same mechanism as array_state.py / parity_status.py: inject an IIFE right after
-the service's decoration statement, in the module scope where the
-`DockerTemplateScannerService` binding is live.
+v2 uses two independent rules:
+  1. skip `runner-<token>-project-N-concurrent-N-` and `-cache-` names. Also
+     stops templateMappings growing -- those were 1323 of 1409 entries.
+  2. test key presence, not truthiness. `scanTemplates()` already writes
+     `mappings[name] = null` for a container it could not match, then re-reads
+     it with `!mappings[name]` and treats its own record as "never tried".
+
+Rule 2 means a template added later is not picked up until the API restarts.
+
+Injected after the service's decoration statement, same as array_state.py.
 """
 from __future__ import annotations
 
@@ -30,13 +29,18 @@ import os
 from companion._bundle import find_bundle
 from companion._runtime import log
 
-SCANNER_DEDUPE_MARKER = "/* u-manager-companion: docker template scanner dedupe v1 */"
+SCANNER_DEDUPE_MARKER = "/* u-manager-companion: docker template scanner dedupe v2 */"
+_V1_MARKER = "/* u-manager-companion: docker template scanner dedupe v1 */"
 
 _OVERLAY = "\n" + SCANNER_DEDUPE_MARKER + "\n" + r"""
 ;(() => {
     const proto = DockerTemplateScannerService.prototype;
     const orig = proto.syncMissingContainers;
     if (typeof orig !== 'function') return;
+
+    // GitLab CI throwaway containers, both naming shapes.
+    const EPHEMERAL = /^runner-[0-9a-z]+-(project-\d+-concurrent-\d+|cache)-/i;
+
     proto.syncMissingContainers = async function patchedSyncMissingContainers(containers) {
         try {
             const config = this.dockerConfigService.getConfig();
@@ -45,26 +49,15 @@ _OVERLAY = "\n" + SCANNER_DEDUPE_MARKER + "\n" + r"""
             const unmapped = [];
             for (const c of (containers || [])) {
                 const n = this.getPrimaryContainerName(c);
-                if (n && !mappings[n] && !skipSet.has(n)) unmapped.push(n);
+                if (!n) continue;
+                if (EPHEMERAL.test(n)) continue;
+                if (n in mappings) continue;   // null means "already tried"
+                if (skipSet.has(n)) continue;
+                unmapped.push(n);
             }
-            if (unmapped.length === 0) {
-                this.__umLastUnmappedKey = '';
-                return false;
-            }
-            const key = unmapped.sort().join('|');
-            if (key === this.__umLastUnmappedKey) {
-                // Same unmappable container set as the last scan. Re-scanning
-                // cannot create a template that does not exist, so skip it.
-                // This breaks the runaway loop on ephemeral containers (e.g.
-                // GitLab CI runner build containers) that never match a
-                // template and would otherwise re-trigger a full scan on every
-                // call, pegging the API's event loop.
-                return false;
-            }
-            // Record BEFORE running so a throwing scan can't reopen the loop.
-            this.__umLastUnmappedKey = key;
+            if (unmapped.length === 0) return false;
         } catch (e) {
-            // On any inspection error, fall back to the original behaviour.
+            // fall back to the original on any inspection error
         }
         return orig.call(this, containers);
     };
@@ -76,7 +69,7 @@ _ANCHOR = "], DockerTemplateScannerService);"
 
 
 def patch_docker_template_scanner_bundle() -> bool:
-    """Dedupe DockerTemplateScannerService.syncMissingContainers scans."""
+    """Stop DockerTemplateScannerService re-scanning for unmappable containers."""
     bundle = find_bundle()
     if not bundle:
         log("docker-template-scanner patch: bundle not found")
@@ -85,6 +78,10 @@ def patch_docker_template_scanner_bundle() -> bool:
         content = f.read()
     if SCANNER_DEDUPE_MARKER in content:
         return False
+    if _V1_MARKER in content:
+        # Leave v1 in place; v2 is appended after it, wraps it, and
+        # short-circuits before v1's set-key logic runs.
+        log("docker-template-scanner patch: v1 overlay present, layering v2 on top")
     if _ANCHOR not in content:
         log("docker-template-scanner patch: decoration anchor not found")
         return False
