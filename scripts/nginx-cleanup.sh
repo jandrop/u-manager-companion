@@ -50,14 +50,20 @@ if [ -f "$LOCATIONS_CONF_PATH" ]; then
     fi
 fi
 
-# 3. Validated reload: only reload if the (now companion-free) tree still
-#    passes `nginx -t` -- never blindly reload, and never fail the uninstall
-#    if nginx itself is unavailable for any reason (e.g. running inside a
-#    sandboxed test harness).
+# 3. Validated reload, deferred. Only reload if the tree still passes
+#    `nginx -t`, and never fail the uninstall if nginx is unavailable.
+#
+#    Deferred because the webGui's "Remove Plugin" dialog gets this script's
+#    output over a connection served by this same nginx. Reloading in-line
+#    orphans it -- nginx logs `open socket ... left in connection` and aborts,
+#    and the dialog spins forever even though the removal finished. setsid +
+#    closed stdio survives `rm -rf` of the plugin dir: the child runs a command
+#    string, not this file.
 if [ -x "$NGINX_BIN" ]; then
     if "$NGINX_BIN" -t >/dev/null 2>&1; then
-        "$NGINX_BIN" -s reload >/dev/null 2>&1
-        log "nginx config valid, reloaded"
+        setsid bash -c "sleep ${RELOAD_DELAY:-5}; \"$NGINX_BIN\" -t >/dev/null 2>&1 && \"$NGINX_BIN\" -s reload >/dev/null 2>&1 && logger -t \"$LOG_TAG\" 'nginx reloaded (deferred)'" \
+            </dev/null >/dev/null 2>&1 &
+        log "nginx config valid, reload scheduled in ${RELOAD_DELAY:-5}s"
     else
         log "WARNING: nginx -t failed after cleanup, skipping reload (webgui config left as-is)"
     fi
