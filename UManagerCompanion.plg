@@ -339,7 +339,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <!-- Placeholder in the source repo; CI computes and injects the real SHA at
      release time (see .github/workflows/release.yml), same as the service
      bundle below. Keeps the committed .plg SHA-clean. -->
-<SHA256>dc2a305ab32a6316e764b4e6ba73dfd395a4fa696c2375c25ced223d37e6f98b</SHA256>
+<SHA256>28016e2adbb03ca6fcb125727acaa873d06e175ee4ac654d8d6d8cc4ce6479e0</SHA256>
 </FILE>
 
 <!-- The standalone GraphQL service bundle (esbuild-produced single-file CJS,
