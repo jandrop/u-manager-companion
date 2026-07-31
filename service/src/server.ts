@@ -66,7 +66,7 @@ import { resolveIdentityViaMeFallback } from './auth/identity.js';
 import { resolveCompanionConfig, type CompanionConfig } from './platform/config.js';
 import { runNginxStartupSequence } from './startup.js';
 import { createAuditLogger, type AuditLogger } from './audit.js';
-import { createDockerClient } from './platform/docker-client.js';
+import { createDockerClient, type DockerClient } from './platform/docker-client.js';
 import { runStreamedProcess, runDetachedProcess } from './platform/process-runner.js';
 import { installDockerTemplate } from './features/docker_template/install.js';
 import { editDockerTemplate } from './features/docker_template/edit.js';
@@ -147,25 +147,49 @@ const TEMPLATES_USER_DIR = '/boot/config/plugins/dockerMan/templates-user';
 const S3_SLEEP_SCRIPT = '/usr/local/emhttp/plugins/dynamix.s3.sleep/scripts/rc.s3sleep';
 
 /**
- * Reads "every container with an available update" from Unraid's own
- * update-status cache (see update.ts module doc for the digest-pair
- * format). Kept deliberately tolerant of a missing/malformed cache file:
- * an empty or unreadable status file means "no known updates," not a
- * hard failure.
+ * Normalises an image reference to the `repo:tag` form Unraid's
+ * update-status file uses for its keys, so both sides of the lookup below
+ * compare equal even when one of them omits the tag.
+ *
+ * A colon only introduces a tag when it comes AFTER the last slash --
+ * without that check `localhost:5000/app` would read its registry port as
+ * a tag and never match. Digest-pinned references are dropped rather than
+ * normalised: `repo@sha256:...` can't match a repo:tag key, and appending
+ * `:latest` to one would produce a reference that means something else.
  */
-async function listUpdatableContainerNames(): Promise<readonly string[]> {
-  const statusPath = '/var/lib/docker/unraid-update-status.json';
+function normalizeImageRef(image: string): string | undefined {
+  if (!image || image.includes('@')) return undefined;
+  return image.lastIndexOf(':') > image.lastIndexOf('/') ? image : `${image}:latest`;
+}
+
+/**
+ * Resolves "every container with an available update" to CONTAINER NAMES,
+ * which is what the update pipeline addresses docker by.
+ *
+ * The status file is keyed by image `repo:tag`, NOT by container name (its
+ * values are the digest pair, updatable when local !== remote). Handing
+ * those keys straight to the update pipeline made every update-all target
+ * fail with `404 no such container: lscr.io/linuxserver/plex:latest`, so
+ * each updatable image is looked up against the container list and the
+ * matching container names are returned instead. One image can back
+ * several containers, so every match is returned.
+ *
+ * Kept deliberately tolerant: a missing/malformed status file, or a docker
+ * list that fails, means "no known updates," not a hard failure.
+ */
+export async function listUpdatableContainerNames(
+  dockerClient: DockerClient,
+  statusPath: string,
+): Promise<readonly string[]> {
+  const updatableImages = new Set<string>();
   try {
     const raw = await fsPromises.readFile(statusPath, 'utf8');
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return [];
-    // Shape: { [containerName]: { local: string, remote: string } } --
-    // updatable when local !== remote. Any entry that doesn't fit this
-    // shape is skipped rather than throwing, so one malformed entry never
-    // blocks every other one.
-    const entries = Object.entries(parsed as Record<string, unknown>);
-    const updatable: string[] = [];
-    for (const [name, value] of entries) {
+    // Any entry that doesn't fit the { local, remote } shape is skipped
+    // rather than throwing, so one malformed entry never blocks every
+    // other one.
+    for (const [image, value] of Object.entries(parsed as Record<string, unknown>)) {
       if (
         value &&
         typeof value === 'object' &&
@@ -173,10 +197,27 @@ async function listUpdatableContainerNames(): Promise<readonly string[]> {
         'remote' in value &&
         (value as { local: unknown }).local !== (value as { remote: unknown }).remote
       ) {
-        updatable.push(name);
+        const normalized = normalizeImageRef(image);
+        if (normalized) updatableImages.add(normalized);
       }
     }
-    return updatable;
+  } catch {
+    return [];
+  }
+  if (updatableImages.size === 0) return [];
+
+  try {
+    const containers = await dockerClient.listContainers({ all: true });
+    const names: string[] = [];
+    for (const container of containers) {
+      const normalized = normalizeImageRef(container.Image);
+      if (!normalized || !updatableImages.has(normalized)) continue;
+      // Docker reports names as a list of aliases, each with a leading
+      // slash ("/plex"); the first one is the container's own name.
+      const name = container.Names[0]?.replace(/^\//, '');
+      if (name) names.push(name);
+    }
+    return names;
   } catch {
     return [];
   }
@@ -234,7 +275,8 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
         runRebuildContainer: runStreamedProcess,
         audit,
         caller,
-        listUpdatableContainerNames,
+        listUpdatableContainerNames: () =>
+          listUpdatableContainerNames(dockerClient, config.dockerUpdateStatusPath),
         updateStatusPath: config.dockerUpdateStatusPath,
         dockerWebuiInfoPath: config.dockerWebuiInfoPath,
       }),
