@@ -7,11 +7,12 @@
  * post-rebuild inspect diff), best-effort orphan-image removal.
  * Update-all resolves updatable targets via an injected lookup
  * (production wiring reads `/var/lib/docker/unraid-update-status.json`
- * and matches against running containers) and runs the per-container
- * pipeline SEQUENTIALLY under one operation, aggregating output across
- * every target. Concurrency: a module-level `busy` flag refuses to start
- * a new update while one is in flight (install/edit ops are independent
- * and NOT gated by this; only update ops share this serialization).
+ * and maps its image repo:tag keys onto container names) and runs the
+ * per-container pipeline SEQUENTIALLY under one operation, aggregating
+ * output across every target. Concurrency: a module-level `busy` flag
+ * refuses to start a new update while one is in flight (install/edit ops
+ * are independent and NOT gated by this; only update ops share this
+ * serialization).
  *
  * `syncUpdateStatusForRepo()` rewrites unraid-update-status.json and the
  * docker.json webui-info cache -- without it the update pipeline
@@ -37,10 +38,11 @@ import type { DockerInstallSubject } from '../docker_template/install.js';
 
 export const DOCKER_INSTALL_CHANNEL_PREFIX = 'DOCKER_INSTALL';
 
-/** Injectable resolver for "every container with an available update".
+/** Injectable resolver for "every container with an available update",
+ * as CONTAINER NAMES -- the pipeline below addresses docker by name.
  * Production wiring reads `/var/lib/docker/unraid-update-status.json`
- * (local!=remote digest pairs) and cross-references running containers;
- * tests inject a fake list directly. */
+ * (keyed by image repo:tag, local!=remote digest pairs) and maps those
+ * images onto container names; tests inject a fake list directly. */
 export type ListUpdatableContainerNames = () => Promise<readonly string[]>;
 
 export interface DockerUpdateDeps {
