@@ -57,6 +57,10 @@ def patch_docker_stats_bundle() -> bool:
     overlay = "\n" + DOCKER_STATS_MARKER + "\n" + r"""
 ;(() => {
     const proto = DockerStatsService.prototype;
+    // Grace period before a stop actually tears the streams down. Observed
+    // stop/start pairs land within ~1s of each other on app resume and tab
+    // switches, so anything comfortably above that collapses them into a no-op.
+    const STOP_GRACE_MS = 5000;
     function formatBytes(b) {
         if (b < 1024) return `${b}B`;
         if (b < 1048576) return `${(b/1024).toFixed(1)}KiB`;
@@ -92,6 +96,13 @@ def patch_docker_stats_bundle() -> bool:
     }
 
     proto.startStatsStream = async function patchedStart() {
+        // A pending teardown means a subscriber left and came straight back
+        // (tab switch, app resume). Cancel it and keep the streams we already
+        // have instead of destroying and rebuilding one per container.
+        if (this._dockerodeStopTimer) {
+            clearTimeout(this._dockerodeStopTimer);
+            this._dockerodeStopTimer = null;
+        }
         if (this._dockerodeActive) return;
         this._dockerodeActive = true;
         this._dockerodeStreams = new Map();
@@ -152,14 +163,22 @@ def patch_docker_stats_bundle() -> bool:
     };
 
     proto.stopStatsStream = function patchedStop() {
-        if (!this._dockerodeActive) return;
-        this._dockerodeActive = false;
-        this.logger.log('Stopping docker stats stream (patched)');
-        if (this._dockerodeStreams) {
-            for (const s of this._dockerodeStreams.values()) destroyStream(s);
-            this._dockerodeStreams.clear();
-        }
-        if (this._dockerodeEvents) { destroyStream(this._dockerodeEvents); this._dockerodeEvents = null; }
+        if (!this._dockerodeActive || this._dockerodeStopTimer) return;
+        // Defer the teardown. Every stop/start pair inside this window would
+        // otherwise destroy and re-open one stream PER CONTAINER, which on a
+        // busy server is hundreds of socket operations on the API's event
+        // loop for a subscriber that never actually went away.
+        this._dockerodeStopTimer = setTimeout(() => {
+            this._dockerodeStopTimer = null;
+            this._dockerodeActive = false;
+            this.logger.log('Stopping docker stats stream (patched)');
+            if (this._dockerodeStreams) {
+                for (const s of this._dockerodeStreams.values()) destroyStream(s);
+                this._dockerodeStreams.clear();
+            }
+            if (this._dockerodeEvents) { destroyStream(this._dockerodeEvents); this._dockerodeEvents = null; }
+        }, STOP_GRACE_MS);
+        if (typeof this._dockerodeStopTimer.unref === 'function') this._dockerodeStopTimer.unref();
     };
 })();
 """
