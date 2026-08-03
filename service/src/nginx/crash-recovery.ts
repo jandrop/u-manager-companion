@@ -14,8 +14,8 @@
  * never trust an untested candidate), then remove the marker. Only after
  * that does the normal startup sequence proceed.
  */
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { atomicWrite } from '../platform/atomic-write.js';
 
 export interface RecoverFromCrashOptions {
   /** Real, on-disk path of the plugin-owned include file. */
@@ -24,13 +24,6 @@ export interface RecoverFromCrashOptions {
 
 function backupPathFor(includePath: string): string {
   return `${includePath}.bak`;
-}
-
-/** Same atomic write-then-rename(2) primitive used by validated-reload.ts. */
-function atomicWrite(targetPath: string, content: string): void {
-  const tempPath = join(dirname(targetPath), `.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
-  writeFileSync(tempPath, content);
-  renameSync(tempPath, targetPath);
 }
 
 /**

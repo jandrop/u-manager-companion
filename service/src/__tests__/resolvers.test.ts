@@ -54,6 +54,22 @@ function makeContext(overrides: Partial<GraphqlContext['deps']> = {}, identity =
       updateShareSecurity: vi.fn().mockResolvedValue(true),
       updateShareAccess: vi.fn().mockResolvedValue(true),
       listInstalledPluginsDetailed: vi.fn().mockResolvedValue([]),
+      diskThresholds: vi.fn().mockResolvedValue({
+        warning: 80,
+        critical: 90,
+        hot: 45,
+        max: 55,
+        hotssd: 60,
+        maxssd: 70,
+      }),
+      updateDiskThresholds: vi.fn().mockResolvedValue({
+        warning: 75,
+        critical: 85,
+        hot: 40,
+        max: 50,
+        hotssd: 55,
+        maxssd: 65,
+      }),
       ...overrides,
     },
   };
@@ -273,6 +289,52 @@ describe('resolvers.UnraidPluginsMutations.checkForUpdates', () => {
     const context = makeContext({}, makeIdentity('full'));
     const result = resolvers.UnraidPluginsMutations.checkForUpdates({}, {}, context);
     expect(result).toBe(true);
+  });
+});
+
+describe('resolvers.Query.diskThresholds', () => {
+  it('is NOT permission-gated -- calls context.deps.diskThresholds() for a read-only caller', async () => {
+    const diskThresholds = vi.fn().mockResolvedValue({
+      warning: 80,
+      critical: 90,
+      hot: 45,
+      max: 55,
+      hotssd: 60,
+      maxssd: 70,
+    });
+    const context = makeContext({ diskThresholds }, makeIdentity('read-only'));
+
+    const result = await resolvers.Query.diskThresholds({}, {}, context);
+
+    expect(diskThresholds).toHaveBeenCalled();
+    expect(result).toEqual({ warning: 80, critical: 90, hot: 45, max: 55, hotssd: 60, maxssd: 70 });
+  });
+});
+
+describe('resolvers.Mutation.updateDiskThresholds', () => {
+  it('throws PermissionError for a read-only identity', () => {
+    const context = makeContext({}, makeIdentity('read-only'));
+    const input = { warning: 75, critical: 85, hot: 40, max: 50, hotssd: 55, maxssd: 65 };
+
+    expect(() => resolvers.Mutation.updateDiskThresholds({}, { input }, context)).toThrow(PermissionError);
+  });
+
+  it('calls through to context.deps.updateDiskThresholds for a full-authority identity', async () => {
+    const updateDiskThresholds = vi.fn().mockResolvedValue({
+      warning: 75,
+      critical: 85,
+      hot: 40,
+      max: 50,
+      hotssd: 55,
+      maxssd: 65,
+    });
+    const context = makeContext({ updateDiskThresholds }, makeIdentity('full'));
+    const input = { warning: 75, critical: 85, hot: 40, max: 50, hotssd: 55, maxssd: 65 };
+
+    const result = await resolvers.Mutation.updateDiskThresholds({}, { input }, context);
+
+    expect(updateDiskThresholds).toHaveBeenCalledWith(input, expect.anything());
+    expect(result).toEqual({ warning: 75, critical: 85, hot: 40, max: 50, hotssd: 55, maxssd: 65 });
   });
 });
 

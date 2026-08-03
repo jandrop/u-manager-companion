@@ -57,6 +57,12 @@ const DEFAULT_UPDATE_STATUS_PATH = '/var/lib/docker/unraid-update-status.json';
 const DEFAULT_DOCKER_WEBUI_INFO_PATH =
   '/usr/local/emhttp/state/plugins/dynamix.docker.manager/docker.json';
 
+/** Dynamix's own general-display settings file -- holds the six global
+ * disk-health threshold keys (warning/critical/hot/max/hotssd/maxssd)
+ * under its [display] section, alongside unrelated Dynamix UI
+ * preferences. features/disk_thresholds is the only consumer. */
+const DEFAULT_DYNAMIX_CFG_PATH = '/boot/config/plugins/dynamix/dynamix.cfg';
+
 export interface CompanionConfig {
   /** Loopback-only port the Apollo/graphql-ws server binds. */
   readonly servicePort: number;
@@ -93,6 +99,9 @@ export interface CompanionConfig {
   /** Unraid webui's docker-info cache path (docker_update/update.ts's
    * syncUpdateStatusForRepo()). */
   readonly dockerWebuiInfoPath: string;
+  /** Dynamix's general-display settings file path
+   * (features/disk_thresholds/platform.ts's createDynamixConfigClient()). */
+  readonly dynamixConfigPath: string;
 }
 
 /** Parses a boolean-ish env value ('1'/'true' => true, anything else => the
@@ -139,5 +148,6 @@ export function resolveCompanionConfig(env: NodeJS.ProcessEnv = process.env): Co
     runDir: env['COMPANION_RUN_DIR'] ?? DEFAULT_RUN_DIR,
     dockerUpdateStatusPath: env['COMPANION_UPDATE_STATUS_PATH'] ?? DEFAULT_UPDATE_STATUS_PATH,
     dockerWebuiInfoPath: env['COMPANION_DOCKER_WEBUI_INFO_PATH'] ?? DEFAULT_DOCKER_WEBUI_INFO_PATH,
+    dynamixConfigPath: env['COMPANION_DYNAMIX_CONFIG_PATH'] ?? DEFAULT_DYNAMIX_CFG_PATH,
   };
 }

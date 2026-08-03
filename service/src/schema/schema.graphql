@@ -69,6 +69,9 @@ type Query {
 
   "Installed Unraid OS plugins enriched with parsed .plg manifest metadata (name, author, version, description, changelog, cached update info). Mirrors installedUnraidPluginsDetailedQuery in unraid_graphql_plugins_queries.dart exactly."
   installedUnraidPluginsDetailed: [InstalledPluginManifest!]!
+
+  "Global disk-health thresholds read from dynamix.cfg's [display] section. Each field is nullable -- an absent key returns null rather than a substituted default, so the caller can tell 'not set' from an actual value. Ungated: any authenticated identity may read these."
+  diskThresholds: DiskThresholds!
 }
 
 type Mutation {
@@ -90,6 +93,9 @@ type Mutation {
 
   "Updates per-user share access. `access` is a list of {userId, access} entries (access: read-write/read-only/no-access). Mirrors updateShareAccessMutation."
   updateShareAccess(name: String!, access: JSON!): Boolean!
+
+  "Updates the six global disk-health thresholds in dynamix.cfg's [display] section. Persists all six atomically and preserves every unrelated key, key order, and every other section byte-for-byte. Returns the parse of the file that was just written."
+  updateDiskThresholds(input: DiskThresholdsInput!): DiskThresholds!
 }
 
 type Subscription {
@@ -331,6 +337,36 @@ type InstalledPluginManifest {
   latestVersion: String
   "Timestamp of the cached remote .plg at /tmp/plugins/<filename> -- when Unraid last fetched it via plugin checkall. ISO 8601 string."
   lastCheckedAt: String
+}
+
+# ---------------------------------------------------------------------------
+# Disk thresholds
+# ---------------------------------------------------------------------------
+
+"Global disk-health thresholds, as read from dynamix.cfg's [display] section. Every field is nullable: an absent key reads as null, not a substituted default -- the same tri-state Unraid's own webGUI preserves by rendering inherited per-disk values in blue rather than substituting the parent value."
+type DiskThresholds {
+  "Array utilization warning percentage (0-100)."
+  warning: Int
+  "Array utilization critical percentage (0-100)."
+  critical: Int
+  "Disk temperature warning threshold in Celsius (0-300)."
+  hot: Int
+  "Disk temperature critical threshold in Celsius (0-300)."
+  max: Int
+  "Cache/SSD temperature warning threshold in Celsius (0-300)."
+  hotssd: Int
+  "Cache/SSD temperature critical threshold in Celsius (0-300)."
+  maxssd: Int
+}
+
+"Mutation input for updateDiskThresholds -- every field required. Unlike DiskThresholds' nullable read side, a write always supplies an explicit value per field."
+input DiskThresholdsInput {
+  warning: Int!
+  critical: Int!
+  hot: Int!
+  max: Int!
+  hotssd: Int!
+  maxssd: Int!
 }
 
 # ---------------------------------------------------------------------------
