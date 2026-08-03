@@ -241,7 +241,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
   // shares.ini parse) getShares -- see platform.ts's module doc.
   const sharesClient = createEmhttpdClient();
   const pluginManifestClient = createPluginManifestClient();
-  const dynamixConfigClient = createDynamixConfigClient(config.dynamixConfigPath);
+  const dynamixConfigClient = createDynamixConfigClient(config.dynamixConfigPath, config.dynamixDefaultsPath);
 
   return {
     installDockerTemplate: (input) =>

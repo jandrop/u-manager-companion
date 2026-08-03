@@ -62,7 +62,7 @@ describe('schema.graphql', () => {
     );
   });
 
-  it('DiskThresholds output fields are nullable Int; DiskThresholdsInput fields are required Int!', () => {
+  it('DiskThresholds and DiskThresholdsInput fields are all nullable Int; defaults are Int!', () => {
     const sdl = readFileSync(SDL_PATH, 'utf8');
     const schema = buildSchema(sdl);
     const keys = ['warning', 'critical', 'hot', 'max', 'hotssd', 'maxssd'];
@@ -78,7 +78,7 @@ describe('schema.graphql', () => {
     expect(inputType).toBeDefined();
     const inputFields = inputType.getFields();
     for (const key of keys) {
-      expect(inputFields[key]!.type.toString()).toBe('Int!');
+      expect(inputFields[key]!.type.toString()).toBe('Int');
     }
   });
 

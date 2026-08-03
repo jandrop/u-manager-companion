@@ -41,7 +41,16 @@ export interface DiskThresholdsRecord {
 
 /** Write side -- every field required. A mutation always supplies an
  * explicit value per field (see spec's "SDL Read/Write Asymmetry"). */
-export type DiskThresholdsInput = { readonly [K in keyof DiskThresholdsRecord]: number };
+/** A write request. `null` for a key means "the user cleared this field":
+ * the key is REMOVED from `[display]` so the value falls back to Unraid's
+ * own `default.cfg`. This mirrors update.php's documented `#cleanup`
+ * behaviour ("parameters with empty strings are omitted from being
+ * written to the file"), which is what the webGUI's Disk Settings form
+ * sets. Writing the stock default explicitly instead would PIN the key
+ * and is a different, lossier operation. */
+export type DiskThresholdsInput = {
+  readonly [K in keyof DiskThresholdsRecord]: number | null;
+};
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-testable without any IO)
@@ -223,6 +232,8 @@ export function patchDiskThresholds(cfgText: string, values: DiskThresholdsInput
 
   const { headerIndex, endIndex } = bounds;
   const found = new Set<DiskThresholdKey>();
+  // Collected then spliced in reverse so earlier indices stay valid.
+  const removals: number[] = [];
 
   for (let i = headerIndex + 1; i < endIndex; i += 1) {
     const line = lines[i]!;
@@ -234,6 +245,14 @@ export function patchDiskThresholds(cfgText: string, values: DiskThresholdsInput
     if (!isDiskThresholdKey(key)) continue;
 
     found.add(key);
+
+    if (values[key] === null) {
+      // Cleared -> drop the line entirely so the value inherits from
+      // Unraid's default.cfg, exactly like update.php's #cleanup.
+      removals.push(i);
+      continue;
+    }
+
     const indent = kvMatch[1] ?? '';
     const eq = kvMatch[3] ?? '';
     const rawValue = kvMatch[4] ?? '';
@@ -241,11 +260,26 @@ export function patchDiskThresholds(cfgText: string, values: DiskThresholdsInput
     lines[i] = `${indent}${key}${eq}${formatThresholdValue(rawValue, values[key])}${trailing}${terminator}`;
   }
 
-  const missing = DISK_THRESHOLD_KEYS.filter((key) => !found.has(key));
+  // Removals FIRST, highest index first, so the remaining indices stay
+  // valid. Doing this after the append below would splice against stale
+  // positions.
+  for (const index of removals.sort((a, b) => b - a)) {
+    lines.splice(index, 1);
+  }
+
+  // A key that is absent AND cleared is already in the desired state; only
+  // absent keys carrying a real value need appending.
+  const missing = DISK_THRESHOLD_KEYS.filter(
+    (key) => !found.has(key) && values[key] !== null,
+  );
   if (missing.length > 0) {
-    const insertAt = lastNonBlankLineIndex(lines, headerIndex, endIndex);
+    // Bounds are recomputed: the removals above may have shrunk the block.
+    const rebounds = findDisplaySectionBounds(lines);
+    const from = rebounds?.headerIndex ?? headerIndex;
+    const to = rebounds?.endIndex ?? endIndex;
+    const insertAt = lastNonBlankLineIndex(lines, from, to);
     const eol =
-      dominantTerminator(lines, headerIndex, endIndex) || dominantTerminator(lines, 0, lines.length) || '\n';
+      dominantTerminator(lines, from, to) || dominantTerminator(lines, 0, lines.length) || '\n';
     const newLines = missing.map((key) => `${key}="${values[key]}"${eol}`);
     lines.splice(insertAt + 1, 0, ...newLines);
   }
@@ -257,6 +291,40 @@ export function patchDiskThresholds(cfgText: string, values: DiskThresholdsInput
 // DynamixConfigClient -- the injectable surface resolvers.ts depends on
 // ---------------------------------------------------------------------------
 
+/** Unraid's shipped values, used only if default.cfg cannot be read at
+ * all (it lives on squashfs and always exists in practice). Keeping them
+ * here rather than in the app means one copy on the machine that owns the
+ * file, not one per client. */
+const SHIPPED_FALLBACK: DiskThresholdDefaults = {
+  warning: 70,
+  critical: 90,
+  hot: 45,
+  max: 55,
+  hotssd: 60,
+  maxssd: 70,
+};
+
+/** Non-null counterpart of DiskThresholdsRecord: a default always resolves. */
+export type DiskThresholdDefaults = { readonly [K in DiskThresholdKey]: number };
+
+/** Parses Unraid's default.cfg the same way as dynamix.cfg, filling any
+ * key it somehow lacks from SHIPPED_FALLBACK so callers always get six
+ * concrete numbers. */
+export function parseDiskThresholdDefaults(cfgText: string): DiskThresholdDefaults {
+  const parsed = parseDiskThresholds(cfgText);
+  return {
+    warning: parsed.warning ?? SHIPPED_FALLBACK.warning,
+    critical: parsed.critical ?? SHIPPED_FALLBACK.critical,
+    hot: parsed.hot ?? SHIPPED_FALLBACK.hot,
+    max: parsed.max ?? SHIPPED_FALLBACK.max,
+    hotssd: parsed.hotssd ?? SHIPPED_FALLBACK.hotssd,
+    maxssd: parsed.maxssd ?? SHIPPED_FALLBACK.maxssd,
+  };
+}
+
+/** The stock defaults when default.cfg itself is unreadable. */
+export const shippedDiskThresholdDefaults = (): DiskThresholdDefaults => SHIPPED_FALLBACK;
+
 export interface DynamixConfigClient {
   /** Reads the full raw text of dynamix.cfg. Throws when the file is
    * missing or unreadable -- unlike shares.ini, there is no safe
@@ -264,6 +332,10 @@ export interface DynamixConfigClient {
    * must NOT be copied", item 1): a failed read must surface as an
    * error, not as plausible-looking invented data. */
   readText(): Promise<string>;
+  /** Reads Unraid's shipped default.cfg. Unlike readText() a failure here
+   * is survivable -- the caller degrades to SHIPPED_FALLBACK rather than
+   * failing the whole query over a cosmetic placeholder. */
+  readDefaultsText(): Promise<string>;
   /** Atomically writes the full raw text back (temp file in the same
    * directory + rename(2), via platform/atomic-write.ts). */
   writeText(content: string): Promise<void>;
@@ -271,9 +343,13 @@ export interface DynamixConfigClient {
 
 /** Builds the REAL DynamixConfigClient bound to `cfgPath` (resolved by
  * platform/config.ts, never hardcoded at the call site). */
-export function createDynamixConfigClient(cfgPath: string): DynamixConfigClient {
+export function createDynamixConfigClient(
+  cfgPath: string,
+  defaultsPath: string,
+): DynamixConfigClient {
   return {
     readText: () => readFile(cfgPath, 'utf8'),
+    readDefaultsText: () => readFile(defaultsPath, 'utf8'),
     writeText: (content: string) => Promise.resolve(atomicWrite(cfgPath, content)),
   };
 }

@@ -18,9 +18,13 @@ const FIXTURE = '[display]\nwarning="80"\ncritical="90"\nhot="45"\nmax="55"\nhot
 
 const VALID_INPUT: DiskThresholdsInput = { warning: 75, critical: 85, hot: 40, max: 50, hotssd: 55, maxssd: 65 };
 
+const DEFAULTS_FIXTURE =
+  '[display]\nwarning="70"\ncritical="90"\nhot="45"\nmax="55"\nhotssd="60"\nmaxssd="70"\n';
+
 function makeClient(overrides: Partial<DynamixConfigClient> = {}): DynamixConfigClient {
   return {
     readText: vi.fn().mockResolvedValue(FIXTURE),
+    readDefaultsText: vi.fn().mockResolvedValue(DEFAULTS_FIXTURE),
     writeText: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -36,7 +40,7 @@ describe('getDiskThresholds', () => {
 
     const result = await getDiskThresholds({ client });
 
-    expect(result).toEqual({ warning: 80, critical: 90, hot: 45, max: 55, hotssd: 60, maxssd: 70 });
+    expect(result).toEqual({ warning: 80, critical: 90, hot: 45, max: 55, hotssd: 60, maxssd: 70, defaults: { warning: 70, critical: 90, hot: 45, max: 55, hotssd: 60, maxssd: 70 } });
   });
 
   // Not audited -- ClientDeps carries no audit dependency at all, matching
@@ -158,8 +162,73 @@ describe('updateDiskThresholds -- audit + write', () => {
 
     const result = await updateDiskThresholds(VALID_INPUT, { client, audit, caller: makeCaller() });
 
-    expect(result).toEqual(VALID_INPUT);
+    expect(result).toEqual({
+      ...VALID_INPUT,
+      defaults: { warning: 70, critical: 90, hot: 45, max: 55, hotssd: 60, maxssd: 70 },
+    });
     expect(readText).toHaveBeenCalledTimes(1);
+  });
+
+  // update.php's #cleanup: an emptied field removes the key so the value
+  // inherits default.cfg. Writing the stock default instead would PIN it.
+  it('a null clears the key instead of writing a value', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const client = makeClient({ writeText });
+    const audit: AuditLogger = { recordAuditEvent: vi.fn() };
+
+    const result = await updateDiskThresholds(
+      { ...VALID_INPUT, warning: null },
+      { client, audit, caller: makeCaller() },
+    );
+
+    const written = writeText.mock.calls[0]![0] as string;
+    expect(written).not.toMatch(/^warning=/m);
+    // The other five survive untouched, and so does everything else.
+    expect(written).toMatch(/^critical="85"$/m);
+    expect(written).toMatch(/^\[parity\]$/m);
+    expect(result.warning).toBeNull();
+  });
+
+  it('clearing every key leaves the section with no threshold lines', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const client = makeClient({ writeText });
+    const audit: AuditLogger = { recordAuditEvent: vi.fn() };
+
+    const cleared = {
+      warning: null, critical: null, hot: null,
+      max: null, hotssd: null, maxssd: null,
+    };
+    const result = await updateDiskThresholds(cleared, {
+      client, audit, caller: makeCaller(),
+    });
+
+    const written = writeText.mock.calls[0]![0] as string;
+    for (const key of ['warning', 'critical', 'hot', 'max', 'hotssd', 'maxssd']) {
+      expect(written).not.toMatch(new RegExp(`^${key}=`, 'm'));
+    }
+    expect(written).toMatch(/^\[display\]$/m);
+    expect(written).toMatch(/^\[parity\]$/m);
+    expect(result.warning).toBeNull();
+    // Defaults still resolve so a client can render placeholders.
+    expect(result.defaults.warning).toBe(70);
+  });
+
+  it('a null for an already-absent key is a no-op, not an append', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const client = makeClient({
+      readText: vi.fn().mockResolvedValue('[display]\ncritical="90"\n[parity]\n'),
+      writeText,
+    });
+    const audit: AuditLogger = { recordAuditEvent: vi.fn() };
+
+    await updateDiskThresholds(
+      { warning: null, critical: 88, hot: null, max: null, hotssd: null, maxssd: null },
+      { client, audit, caller: makeCaller() },
+    );
+
+    const written = writeText.mock.calls[0]![0] as string;
+    expect(written).not.toMatch(/^warning=/m);
+    expect(written).toMatch(/^critical="88"$/m);
   });
 
   it('writes byte-preserving patched content, keeping unrelated sections intact', async () => {

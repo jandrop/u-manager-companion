@@ -16,8 +16,19 @@
  * round-trip), so 'initiated' is the terminal outcome recorded.
  */
 import type { AuditCaller, AuditLogger } from '../../audit.js';
-import type { DiskThresholdKey, DiskThresholdsInput, DiskThresholdsRecord, DynamixConfigClient } from './platform.js';
-import { parseDiskThresholds, patchDiskThresholds } from './platform.js';
+import type {
+  DiskThresholdDefaults,
+  DiskThresholdKey,
+  DiskThresholdsInput,
+  DiskThresholdsRecord,
+  DynamixConfigClient,
+} from './platform.js';
+import {
+  parseDiskThresholdDefaults,
+  parseDiskThresholds,
+  patchDiskThresholds,
+  shippedDiskThresholdDefaults,
+} from './platform.js';
 
 const PERCENTAGE_KEYS: readonly DiskThresholdKey[] = ['warning', 'critical'];
 const TEMPERATURE_KEYS: readonly DiskThresholdKey[] = ['hot', 'max', 'hotssd', 'maxssd'];
@@ -46,18 +57,35 @@ function validateRange(key: DiskThresholdKey, value: number, min: number, max: n
  * deliberately NOT enforced (see spec's "Inverted thresholds accepted"
  * scenario). */
 function validateDiskThresholdsInput(input: DiskThresholdsInput): void {
+  // null means "clear this key so it inherits default.cfg" -- there is
+  // nothing to range-check, and rejecting it would make the field
+  // impossible to unset from a client.
   for (const key of PERCENTAGE_KEYS) {
-    validateRange(key, input[key], 0, 100);
+    const value = input[key];
+    if (value !== null) validateRange(key, value, 0, 100);
   }
   for (const key of TEMPERATURE_KEYS) {
-    validateRange(key, input[key], 0, 300);
+    const value = input[key];
+    if (value !== null) validateRange(key, value, 0, 300);
+  }
+}
+
+/** Unraid's placeholders. A missing or unreadable default.cfg must not
+ * fail the query -- the shipped constants are a faithful stand-in. */
+async function readDefaults(deps: ClientDeps): Promise<DiskThresholdDefaults> {
+  try {
+    return parseDiskThresholdDefaults(await deps.client.readDefaultsText());
+  } catch {
+    return shippedDiskThresholdDefaults();
   }
 }
 
 /** Backs `Query.diskThresholds`. Read-only -- NOT audited. */
-export async function getDiskThresholds(deps: ClientDeps): Promise<DiskThresholdsRecord> {
+export async function getDiskThresholds(
+  deps: ClientDeps,
+): Promise<DiskThresholdsRecord & { defaults: DiskThresholdDefaults }> {
   const cfgText = await deps.client.readText();
-  return parseDiskThresholds(cfgText);
+  return { ...parseDiskThresholds(cfgText), defaults: await readDefaults(deps) };
 }
 
 /** Backs `Mutation.updateDiskThresholds(input)`. Validates first (before
@@ -67,7 +95,7 @@ export async function getDiskThresholds(deps: ClientDeps): Promise<DiskThreshold
 export async function updateDiskThresholds(
   input: DiskThresholdsInput,
   deps: MutationDeps,
-): Promise<DiskThresholdsRecord> {
+): Promise<DiskThresholdsRecord & { defaults: DiskThresholdDefaults }> {
   validateDiskThresholdsInput(input);
 
   const currentText = await deps.client.readText();
@@ -81,5 +109,8 @@ export async function updateDiskThresholds(
   const patchedText = patchDiskThresholds(currentText, input);
   await deps.client.writeText(patchedText);
 
-  return parseDiskThresholds(patchedText);
+  return {
+    ...parseDiskThresholds(patchedText),
+    defaults: await readDefaults(deps),
+  };
 }

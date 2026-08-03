@@ -357,16 +357,28 @@ type DiskThresholds {
   hotssd: Int
   "Cache/SSD temperature critical threshold in Celsius (0-300)."
   maxssd: Int
+  "Unraid's own stock values from its shipped default.cfg. The webGUI renders these as the input placeholders whenever a key is unset, so a client can show exactly what the server would fall back to instead of inventing its own defaults."
+  defaults: DiskThresholdDefaults!
 }
 
-"Mutation input for updateDiskThresholds -- every field required. Unlike DiskThresholds' nullable read side, a write always supplies an explicit value per field."
-input DiskThresholdsInput {
+"Unraid's shipped fallbacks, read from plugins/dynamix/default.cfg."
+type DiskThresholdDefaults {
   warning: Int!
   critical: Int!
   hot: Int!
   max: Int!
   hotssd: Int!
   maxssd: Int!
+}
+
+"Mutation input for updateDiskThresholds. Every field is nullable and null means CLEAR: the key is removed from [display] so the value inherits Unraid's default.cfg -- the same thing the webGUI does when you empty the field and press Apply (update.php's #cleanup)."
+input DiskThresholdsInput {
+  warning: Int
+  critical: Int
+  hot: Int
+  max: Int
+  hotssd: Int
+  maxssd: Int
 }
 
 # ---------------------------------------------------------------------------
