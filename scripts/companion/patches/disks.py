@@ -34,8 +34,8 @@ def patch_disks_service_bundle() -> bool:
     This patch replaces `getDisks` with an implementation that mirrors
     the web UI strategy:
 
-    * Identity (vendor/model/serial/firmware/transport) comes from
-      `lsblk -d -J -O`, which reads sysfs only.
+    * Identity (vendor/model/serial/firmware/transport/drive class)
+      comes from `lsblk -d -J -O`, which reads sysfs only.
     * `smartStatus` comes from `smartctl -n standby -H -j`. If the
       drive is asleep `smartctl` exits with code 2 without touching it
       and the patch returns `UNKNOWN`.
@@ -107,6 +107,27 @@ def patch_disks_service_bundle() -> bool:
         return RX.test(name);
     }
 
+    // Drive class, mirroring what `diskLayout()` from systeminformation
+    // returns upstream ('HD' | 'SSD' | 'NVMe') so the patched resolver stops
+    // diverging from stock on this field. Stock reads
+    // /sys/block/<dev>/queue/rotational with one execSync PER DISK and lets
+    // an NVMe transport win over it; `lsblk -d -J -O` already carries the
+    // same two bits in the output we just parsed, so we get parity without
+    // the extra spawns -- which is the whole point of this patch.
+    //
+    // `rota` arrives as a JSON boolean on current util-linux (2.42 on
+    // Unraid 7.3) and as a "0"/"1" string on older releases; the companion
+    // runs on whatever Unraid ships, so accept both. Stock also has a
+    // last-resort guess from the model string for when the sysfs read
+    // fails -- not mirrored here because `-O` always carries `rota`, and
+    // falling back to 'HD' is Unraid's own default for an unknown drive
+    // (`_var($disk,'rotational',1)` in the dynamix monitor script).
+    function deriveDriveClass(d) {
+        if ((d.tran || '').trim().toLowerCase() === 'nvme') return 'NVMe';
+        if (d.rota === false || d.rota === '0' || d.rota === 0) return 'SSD';
+        return 'HD';
+    }
+
     async function listDisksViaLsblk() {
         const { stdout } = await execa('lsblk', ['-d', '-J', '-O']);
         let parsed;
@@ -122,7 +143,7 @@ def patch_disks_service_bundle() -> bool:
                 firmwareRevision: (d.rev || '').trim(),
                 interfaceType: (d.tran || '').trim(),
                 size: typeof d.size === 'number' ? d.size : (parseInt(d.size, 10) || 0),
-                type: 'disk',
+                type: deriveDriveClass(d),
             }));
     }
 
