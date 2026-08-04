@@ -32,6 +32,7 @@ export const CAPABILITY_KEYS = [
   'plugins.checkForUpdates',
   'plugins.installedDetailed',
   'shares',
+  'diskThresholds',
 ] as const;
 
 /** Union of every valid capability key string. */

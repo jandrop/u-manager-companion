@@ -36,6 +36,7 @@ describe('schema.graphql', () => {
         'deleteShare',
         'updateShareSecurity',
         'updateShareAccess',
+        'updateDiskThresholds',
       ].sort(),
     );
   });
@@ -56,8 +57,29 @@ describe('schema.graphql', () => {
         'shareSecurityUsers',
         'shareIsEmpty',
         'installedUnraidPluginsDetailed',
+        'diskThresholds',
       ].sort(),
     );
+  });
+
+  it('DiskThresholds and DiskThresholdsInput fields are all nullable Int; defaults are Int!', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+    const keys = ['warning', 'critical', 'hot', 'max', 'hotssd', 'maxssd'];
+
+    const outputType = schema.getType('DiskThresholds') as import('graphql').GraphQLObjectType;
+    expect(outputType).toBeDefined();
+    const outputFields = outputType.getFields();
+    for (const key of keys) {
+      expect(outputFields[key]!.type.toString()).toBe('Int');
+    }
+
+    const inputType = schema.getType('DiskThresholdsInput') as import('graphql').GraphQLInputObjectType;
+    expect(inputType).toBeDefined();
+    const inputFields = inputType.getFields();
+    for (const key of keys) {
+      expect(inputFields[key]!.type.toString()).toBe('Int');
+    }
   });
 
   it('declares the v1 Subscription field (dockerInstallUpdates)', () => {
@@ -101,6 +123,7 @@ describe('CAPABILITY_KEYS', () => {
         'plugins.checkForUpdates',
         'plugins.installedDetailed',
         'shares',
+        'diskThresholds',
       ].sort(),
     );
   });

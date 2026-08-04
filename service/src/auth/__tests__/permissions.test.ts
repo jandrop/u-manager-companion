@@ -66,6 +66,13 @@ describe('OPERATION_PERMISSIONS', () => {
       action: 'update',
     });
   });
+
+  it('maps diskThresholds (the mutation) to the DISPLAY resource, update action', () => {
+    expect(OPERATION_PERMISSIONS['diskThresholds']).toEqual({
+      resource: 'DISPLAY',
+      action: 'update',
+    });
+  });
 });
 
 describe('isAuthorized', () => {

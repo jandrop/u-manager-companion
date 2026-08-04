@@ -6,6 +6,8 @@
  *   - docker template install/edit/delete, docker update streams -> DOCKER (update)
  *   - power shutdown/reboot/sleep -> SERVERS (update)
  *   - plugin uninstall/update-check -> PLUGINS (update)
+ *   - updateDiskThresholds -> DISPLAY (update); the diskThresholds READ
+ *     query is ungated in resolvers.ts, same posture as the shares reads
  *   - shares mutations (create/update/delete/security/access) -> SHARE (update)
  *     (Unraid's own permission model splits share access into separate
  *     CREATE_ANY/UPDATE_ANY/DELETE_ANY grants on Resource.SHARE; this service
@@ -30,7 +32,7 @@ import type { Authority, ResolvedIdentity } from './keystore.js';
  * here. */
 export type CompanionOperation = CapabilityKey;
 
-export type PermissionResource = 'DOCKER' | 'SERVERS' | 'PLUGINS' | 'SHARE';
+export type PermissionResource = 'DOCKER' | 'SERVERS' | 'PLUGINS' | 'SHARE' | 'DISPLAY';
 export type PermissionAction = 'update';
 
 export interface RequiredPermission {
@@ -59,6 +61,7 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   // CapabilityKey.
   'plugins.installedDetailed': { resource: 'PLUGINS', action: 'update' },
   shares: { resource: 'SHARE', action: 'update' },
+  diskThresholds: { resource: 'DISPLAY', action: 'update' },
 };
 
 function permissionKey(permission: RequiredPermission): string {
