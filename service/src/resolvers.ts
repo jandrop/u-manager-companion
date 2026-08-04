@@ -46,6 +46,7 @@ import type {
   ShareSecurityUser,
   ShareSettingsInput,
 } from './features/shares/platform.js';
+import type { DiskThresholdsInput, DiskThresholdsRecord } from './features/disk_thresholds/platform.js';
 
 // ---------------------------------------------------------------------------
 // Context + injected feature-module surface
@@ -114,6 +115,11 @@ export interface FeatureModuleDeps {
     access: readonly ShareAccessEntry[],
     caller: AuditCaller,
   ) => Promise<boolean>;
+  readonly diskThresholds: () => Promise<DiskThresholdsRecord>;
+  readonly updateDiskThresholds: (
+    input: DiskThresholdsInput,
+    caller: AuditCaller,
+  ) => Promise<DiskThresholdsRecord>;
 }
 
 export interface GraphqlContext {
@@ -380,6 +386,15 @@ export const resolvers = {
       const records = await context.deps.listInstalledPluginsDetailed();
       return records.map(toGraphqlPluginManifest);
     },
+    // Read-only -- NOT permission-gated, same posture as the shares reads
+    // above.
+    diskThresholds(
+      _parent: unknown,
+      _args: Record<string, never>,
+      context: GraphqlContext,
+    ): Promise<DiskThresholdsRecord> {
+      return context.deps.diskThresholds();
+    },
   },
 
   Mutation: {
@@ -425,6 +440,14 @@ export const resolvers = {
     ): Promise<boolean> {
       const caller = requirePermission(context, 'shares');
       return context.deps.updateShareAccess(args.name, args.access, caller);
+    },
+    updateDiskThresholds(
+      _parent: unknown,
+      args: { input: DiskThresholdsInput },
+      context: GraphqlContext,
+    ): Promise<DiskThresholdsRecord> {
+      const caller = requirePermission(context, 'diskThresholds');
+      return context.deps.updateDiskThresholds(args.input, caller);
     },
   },
 

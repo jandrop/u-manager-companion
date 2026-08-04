@@ -91,6 +91,8 @@ import {
   updateShareSecurity,
 } from './features/shares/resolvers.js';
 import { createEmhttpdClient } from './features/shares/platform.js';
+import { getDiskThresholds, updateDiskThresholds } from './features/disk_thresholds/resolvers.js';
+import { createDynamixConfigClient } from './features/disk_thresholds/platform.js';
 import { existsSync, promises as fsPromises } from 'node:fs';
 import path from 'node:path';
 
@@ -239,6 +241,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
   // shares.ini parse) getShares -- see platform.ts's module doc.
   const sharesClient = createEmhttpdClient();
   const pluginManifestClient = createPluginManifestClient();
+  const dynamixConfigClient = createDynamixConfigClient(config.dynamixConfigPath, config.dynamixDefaultsPath);
 
   return {
     installDockerTemplate: (input) =>
@@ -307,6 +310,9 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
       updateShareAccess(name, access, { client: sharesClient, audit, caller }),
     listInstalledPluginsDetailed: () =>
       listInstalledPluginsDetailed({ client: pluginManifestClient }),
+    diskThresholds: () => getDiskThresholds({ client: dynamixConfigClient }),
+    updateDiskThresholds: (input) =>
+      updateDiskThresholds(input, { client: dynamixConfigClient, audit, caller }),
   };
 }
 

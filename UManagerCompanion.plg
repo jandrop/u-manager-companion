@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.07.31.1">
+<!ENTITY version "2026.08.04.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,18 @@
 
 <CHANGES>
 <![CDATA[
+###2026.08.04.1
+- Added disk health thresholds to the companion API. The app can now read
+  and change the utilization and temperature warning/critical values that
+  Unraid keeps in Disk Settings, including the separate pair for SSDs.
+- Fixed unassigned SSDs and NVMe drives being reported as spinning disks.
+  The app graded them with the hard-drive temperature limits, so a drive
+  Unraid considers perfectly normal at 50 C was flagged as too hot.
+- Fixed Docker stats streams being torn down and rebuilt every time the
+  app was briefly backgrounded or a tab switched, which reopened one
+  stream per container against the Unraid API for a viewer that never
+  actually left.
+
 ###2026.07.31.1
 - Fixed "Update all" for Docker containers failing instead of updating
   anything. Updating containers one by one already worked.

@@ -24,9 +24,9 @@
  * between step 2 and step 5's restore, a `.bak` file survives on disk and
  * the next startup finishes the recovery before trusting includePath again.
  */
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { execa } from 'execa';
+import { atomicWrite } from '../platform/atomic-write.js';
 
 export interface NginxRunResult {
   readonly exitCode: number;
@@ -81,18 +81,6 @@ export interface ValidatedReloadResult {
 
 function backupPathFor(includePath: string): string {
   return `${includePath}.bak`;
-}
-
-/**
- * Atomically writes `content` to `targetPath`: write to a temp file in the
- * SAME DIRECTORY (required for rename(2) to be atomic -- cross-filesystem
- * renames are not), then rename(2) over targetPath. targetPath is never
- * observable in a partially-written state.
- */
-function atomicWrite(targetPath: string, content: string): void {
-  const tempPath = join(dirname(targetPath), `.${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
-  writeFileSync(tempPath, content);
-  renameSync(tempPath, targetPath);
 }
 
 /**
