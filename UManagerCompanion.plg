@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.08.04.1">
+<!ENTITY version "2026.08.06.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,10 @@
 
 <CHANGES>
 <![CDATA[
+###2026.08.06.1
+- Fixed API keys created with specific permissions being refused every
+  action they were granted. Only full-access keys worked.
+
 ###2026.08.04.1
 - Added disk health thresholds to the companion API. The app can now read
   and change the utilization and temperature warning/critical values that
