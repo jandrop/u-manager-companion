@@ -2,20 +2,26 @@
  * On-disk API key-store reader. VERIFIED shape per box-verification:
  *
  *   dir: /boot/config/plugins/dynamix.my.servers/keys/*.json
- *   file: {createdAt, id, key, name, permissions: [], roles: [str]}
+ *   file: {createdAt, id, key, name, permissions, roles: [str]}
  *   filename = <id>.json (uuid), NOT the key value -- the presented
  *   x-api-key is matched against the `key` FIELD, never the filename.
  *
- * Observed roles: ADMIN, VIEWER. Both observed keys had an empty
- * `permissions` array, so ROLES carry the authority in that case
- * (ADMIN=full, VIEWER=read-only). A non-empty `permissions` array, if
- * ever present, is honored instead of the role default.
+ * Observed roles: ADMIN, VIEWER. A key with an empty `permissions` array
+ * takes its authority from the ROLE (ADMIN=full, VIEWER=read-only).
+ * Explicit grants are objects, matching unraid-api's `Permission` model:
+ *
+ *   "permissions": [{ "resource": "DISPLAY", "actions": ["UPDATE_ANY"] }]
+ *
+ * They are normalized to the `RESOURCE:action` strings permissions.ts
+ * compares against, so nothing downstream sees two shapes.
  *
  * Fail-safe by design: a missing directory, an unreadable file, or a
  * malformed JSON entry is SKIPPED, not thrown -- one corrupt key file
  * must never take down auth for every other valid key. This mirrors the
  * "fail-closed on individual denial, not fail-crash on individual
- * corruption" posture the rest of the auth pipeline takes.
+ * corruption" posture the rest of the auth pipeline takes. An unreadable
+ * permission entry is dropped the same way; dropping one can only narrow
+ * what a key may do.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -29,7 +35,10 @@ export interface KeyStoreEntry {
   readonly key: string;
   readonly name: string;
   readonly roles: readonly string[];
+  /** Normalized `RESOURCE:action` grants. See toPermissionKeys(). */
   readonly permissions: readonly string[];
+  /** Whether the key file listed any explicit grant. */
+  readonly hasExplicitGrants: boolean;
 }
 
 export interface ResolvedIdentity {
@@ -53,7 +62,72 @@ export function resolveKeyStoreDir(): string {
   );
 }
 
-function isKeyStoreEntry(value: unknown): value is KeyStoreEntry {
+/**
+ * Action names that permit a change. Matched upper-cased, as unraid-api's
+ * own parser does.
+ *
+ * `_OWN` is excluded on purpose: it scopes a grant to objects the caller
+ * owns, and everything this service writes is server-wide config with no
+ * owner. `*` is Unraid's shorthand for the full CRUD set.
+ */
+const UPDATE_ACTIONS = new Set(['UPDATE_ANY', '*', 'UPDATE']);
+
+/**
+ * Builds the grant string for `resource` when any of `actions` permits a
+ * change, or an empty list when none does.
+ *
+ * A wildcard resource is left as `*`; isAuthorized() matches it directly,
+ * so a capability added later needs no change here.
+ */
+function toUpdateGrant(
+  resource: string,
+  actions: readonly unknown[],
+): readonly string[] {
+  return actions.some(
+    (action) =>
+      typeof action === 'string' && UPDATE_ACTIONS.has(action.toUpperCase()),
+  )
+    ? [`${resource}:update`]
+    : [];
+}
+
+/**
+ * Normalizes one `permissions` element, or returns an empty list when it
+ * grants nothing this service gates on.
+ *
+ * Takes the object shape unraid-api writes, plus a `RESOURCE:ACTION`
+ * string for any other writer. Strings go through the same action mapping
+ * rather than passing through, so `DISPLAY:UPDATE_ANY` still resolves.
+ */
+function toPermissionKeys(value: unknown): readonly string[] {
+  if (typeof value === 'string') {
+    const separator = value.indexOf(':');
+    if (separator <= 0) return [];
+    return toUpdateGrant(value.slice(0, separator), [
+      value.slice(separator + 1),
+    ]);
+  }
+  if (typeof value !== 'object' || value === null) return [];
+
+  const record = value as Record<string, unknown>;
+  const resource = record['resource'];
+  const actions = record['actions'];
+  if (typeof resource !== 'string' || resource.length === 0) return [];
+  if (!Array.isArray(actions)) return [];
+
+  return toUpdateGrant(resource, actions);
+}
+
+/** A key file as it comes off disk, before permissions are normalized. */
+interface RawKeyRecord {
+  readonly id: string;
+  readonly key: string;
+  readonly name: string;
+  readonly roles: readonly string[];
+  readonly permissions: readonly unknown[];
+}
+
+function isRawKeyRecord(value: unknown): value is RawKeyRecord {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   if (typeof record['id'] !== 'string' || record['id'].length === 0) return false;
@@ -62,9 +136,6 @@ function isKeyStoreEntry(value: unknown): value is KeyStoreEntry {
   if (!Array.isArray(record['roles'])) return false;
   if (!record['roles'].every((role) => typeof role === 'string')) return false;
   if (!Array.isArray(record['permissions'])) return false;
-  if (!record['permissions'].every((permission) => typeof permission === 'string')) {
-    return false;
-  }
   return true;
 }
 
@@ -88,13 +159,17 @@ export function loadKeyStore(dir: string): readonly KeyStoreEntry[] {
     try {
       const raw = readFileSync(path.join(dir, filename), 'utf8');
       const parsed: unknown = JSON.parse(raw);
-      if (isKeyStoreEntry(parsed)) {
+      if (isRawKeyRecord(parsed)) {
         entries.push({
           id: parsed.id,
           key: parsed.key,
           name: parsed.name,
           roles: parsed.roles,
-          permissions: parsed.permissions,
+          // Taken from the raw array, not the normalized one: a grant this
+          // service does not gate on normalizes away to nothing, and an
+          // empty result would hand the key its role's authority instead.
+          hasExplicitGrants: parsed.permissions.length > 0,
+          permissions: parsed.permissions.flatMap(toPermissionKeys),
         });
       }
     } catch {
@@ -111,8 +186,14 @@ const FULL_AUTHORITY_ROLES = new Set(['ADMIN']);
 /** Role names that carry read-only authority when permissions is empty. */
 const READ_ONLY_AUTHORITY_ROLES = new Set(['VIEWER']);
 
+/**
+ * Explicit grants REPLACE the role here, where unraid-api adds the two
+ * together. A key holding both ADMIN and a narrow grant is full admin on
+ * /graphql but limited to its grants here. Deliberate: erring narrow can
+ * only refuse something the user can widen.
+ */
 function deriveAuthority(entry: KeyStoreEntry): Authority {
-  if (entry.permissions.length > 0) return 'scoped';
+  if (entry.hasExplicitGrants) return 'scoped';
   if (entry.roles.some((role) => FULL_AUTHORITY_ROLES.has(role))) return 'full';
   if (entry.roles.some((role) => READ_ONLY_AUTHORITY_ROLES.has(role))) {
     return 'read-only';

@@ -5,7 +5,9 @@
  * Mapping:
  *   - docker template install/edit/delete, docker update streams -> DOCKER (create/update)
  *   - power shutdown/reboot/sleep -> SERVERS (update)
- *   - plugin uninstall/update-check -> the plugin resource (update)
+ *   - plugin uninstall/update-check -> CONFIG (update), the resource
+ *     unraid-api itself gates installPlugin on; there is no PLUGINS
+ *     resource for a key to be granted
  *
  * Key-store path yields real permissions/roles; `{ me }` fallback path
  * ('scoped' authority, no explicit permissions) grants a CONSERVATIVE
@@ -49,20 +51,22 @@ describe('OPERATION_PERMISSIONS', () => {
     expect(OPERATION_PERMISSIONS['power']).toEqual({ resource: 'SERVERS', action: 'update' });
   });
 
-  it('maps plugin uninstall to the plugin resource, update action', () => {
+  // CONFIG is what unraid-api's own installPlugin gates on. Unraid has
+  // no PLUGINS resource, so no key can be granted one.
+  it('maps plugin uninstall to CONFIG:update', () => {
     expect(OPERATION_PERMISSIONS['plugins.uninstall']).toEqual({
-      resource: 'PLUGINS',
+      resource: 'CONFIG',
       action: 'update',
     });
   });
 
-  it('maps plugin update-check (read-only) to the plugin resource with the update action', () => {
-    // Plugin uninstall/update-check are grouped together under the
-    // plugin resource, update action -- update-check itself is
-    // non-privileged for AUDIT purposes but still requires an
-    // authenticated+authorized identity to invoke.
+  it('maps plugin update-check (read-only) to CONFIG with the update action', () => {
+    // Plugin uninstall/update-check are grouped together under the same
+    // resource, update action -- update-check itself is non-privileged
+    // for AUDIT purposes but still requires an authenticated+authorized
+    // identity to invoke.
     expect(OPERATION_PERMISSIONS['plugins.checkForUpdates']).toEqual({
-      resource: 'PLUGINS',
+      resource: 'CONFIG',
       action: 'update',
     });
   });
@@ -105,5 +109,37 @@ describe('isAuthorized', () => {
   it('denies "none" authority access to every operation (fail-closed default)', () => {
     const none = identity({ authority: 'none' });
     expect(isAuthorized(none, 'plugins.uninstall')).toBe(false);
+  });
+
+  // What `-p DISPLAY:UPDATE_ANY` produces.
+  it('grants the disk-thresholds mutation to a key scoped to DISPLAY', () => {
+    const scoped = identity({ authority: 'scoped', permissions: ['DISPLAY:update'] });
+    expect(isAuthorized(scoped, 'diskThresholds')).toBe(true);
+    expect(isAuthorized(scoped, 'shares')).toBe(false);
+  });
+
+  // What `-p CONFIG:UPDATE_ANY` produces. Unraid has no PLUGINS resource,
+  // so a CONFIG grant is the ONLY one that can ever reach these
+  // operations -- the whole reason the map names CONFIG. Asserting the
+  // map entry alone would restate the table; this asserts the decision.
+  it('grants the plugin operations to a key scoped to CONFIG', () => {
+    const scoped = identity({ authority: 'scoped', permissions: ['CONFIG:update'] });
+    expect(isAuthorized(scoped, 'plugins.uninstall')).toBe(true);
+    expect(isAuthorized(scoped, 'plugins.checkForUpdates')).toBe(true);
+    // A CONFIG grant must not spill into unrelated resources.
+    expect(isAuthorized(scoped, 'diskThresholds')).toBe(false);
+    expect(isAuthorized(scoped, 'docker.templateInstall')).toBe(false);
+  });
+
+  it('denies plugin uninstall to a key scoped to another resource', () => {
+    const display = identity({ authority: 'scoped', permissions: ['DISPLAY:update'] });
+    expect(isAuthorized(display, 'plugins.uninstall')).toBe(false);
+  });
+
+  it('honors a wildcard resource grant for every operation', () => {
+    const wildcard = identity({ authority: 'scoped', permissions: ['*:update'] });
+    expect(isAuthorized(wildcard, 'diskThresholds')).toBe(true);
+    expect(isAuthorized(wildcard, 'power')).toBe(true);
+    expect(isAuthorized(wildcard, 'plugins.uninstall')).toBe(true);
   });
 });
