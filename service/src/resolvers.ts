@@ -231,7 +231,7 @@ const PLUGIN_INSTALL_CHANNEL_PREFIX = 'PLUGIN_INSTALL';
 
 interface DockerTemplateConfigInputArg {
   readonly name: string;
-  readonly type: string;
+  readonly type: DockerConfigEntryTypeXml;
   readonly target: string;
   readonly value: string;
   readonly default: string;
@@ -262,16 +262,6 @@ interface DockerTemplateInputArg {
   readonly configs: readonly DockerTemplateConfigInputArg[];
 }
 
-/** SDL DockerConfigEntryType wire values (upper-case) -> the XML title-case
- * form xml.ts's buildTemplateXml expects. */
-const CONFIG_TYPE_WIRE_TO_XML: Readonly<Record<string, DockerConfigEntryTypeXml>> = {
-  PATH: 'Path',
-  PORT: 'Port',
-  VARIABLE: 'Variable',
-  LABEL: 'Label',
-  DEVICE: 'Device',
-};
-
 function mapTemplateInput(
   input: DockerTemplateInputArg,
 ): DockerTemplateInstallInput & DockerTemplateEditInput {
@@ -295,7 +285,7 @@ function mapTemplateInput(
     configs: input.configs.map((config) => ({
       name: config.name,
       target: config.target,
-      type: CONFIG_TYPE_WIRE_TO_XML[config.type] ?? 'Variable',
+      type: config.type,
       value: config.value,
       default: config.default,
       mode: config.mode,
@@ -567,6 +557,13 @@ export const resolvers = {
       },
     },
   },
+
+  // graphql-js uses ONE value map for BOTH directions: serialize() on
+  // DockerTemplateConfig.type and parseValue/parseLiteral on
+  // DockerTemplateConfigInput.type. xml.ts owns the spellings.
+  DockerConfigEntryType: {
+    PATH: 'Path', PORT: 'Port', VARIABLE: 'Variable', LABEL: 'Label', DEVICE: 'Device',
+  } satisfies Record<string, DockerConfigEntryTypeXml>,
 };
 
 /** Exported for server.ts -- the plugin-install channel prefix used by a
