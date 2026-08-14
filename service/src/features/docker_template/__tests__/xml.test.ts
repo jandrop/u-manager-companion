@@ -190,6 +190,12 @@ describe('buildTemplateXml', () => {
     const xml = buildTemplateXml(minimalInput, 'plex');
     expect(xml).not.toContain('MyMAC');
   });
+
+  it('emits the given fixedIp at the existing MyIP position', () => {
+    const xml = buildTemplateXml({ ...minimalInput, fixedIp: '10.0.0.5' }, 'plex');
+    const lines = xml.split('\n');
+    expect(lines[6]).toBe('  <MyIP>10.0.0.5</MyIP>');
+  });
 });
 
 describe('parseTemplateXml (round-trip with buildTemplateXml)', () => {
@@ -224,5 +230,31 @@ describe('parseTemplateXml (round-trip with buildTemplateXml)', () => {
     const parsed = parseTemplateXml(xml);
     expect(parsed.repository).toBe('a&b<c>');
     expect(parsed.overview).toBe('Line with & < > "quote"');
+  });
+
+  // Real on-disk shape: AdGuard-Home carries <MyIP>192.168.1.2</MyIP>.
+  it('reads MyIP into fixedIp', () => {
+    const xml = [
+      '<?xml version="1.0"?>',
+      '<Container version="2">',
+      '  <Name>AdGuard-Home</Name>',
+      '  <Repository>adguard/adguardhome</Repository>',
+      '  <Network>bond0</Network>',
+      '  <MyIP>192.168.1.2</MyIP>',
+      '</Container>',
+    ].join('\n');
+
+    expect(parseTemplateXml(xml).fixedIp).toBe('192.168.1.2');
+  });
+
+  // Empty tag reads as '', absent tag as null -- same as fixedMac, and same
+  // as the bundle patch, which the app already consumes.
+  it('distinguishes the empty MyIP placeholder from a missing tag', () => {
+    const withPlaceholder = buildTemplateXml({ repository: 'r', configs: [] }, 'plex');
+    expect(withPlaceholder).toContain('<MyIP/>');
+    expect(parseTemplateXml(withPlaceholder).fixedIp).toBe('');
+
+    const withoutTag = '<?xml version="1.0"?>\n<Container version="2">\n  <Name>plex</Name>\n</Container>';
+    expect(parseTemplateXml(withoutTag).fixedIp).toBeNull();
   });
 });

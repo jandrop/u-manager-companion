@@ -233,6 +233,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
         dockerClient,
         runRebuildContainer: runStreamedProcess,
         writeTemplateFile: writeTemplate,
+        readTemplateFile,
         audit,
         caller,
       }),

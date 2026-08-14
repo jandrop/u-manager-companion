@@ -233,21 +233,21 @@ interface DockerTemplateConfigInputArg {
   readonly name: string;
   readonly type: DockerConfigEntryTypeXml;
   readonly target: string;
-  readonly value: string;
-  readonly default: string;
-  readonly mode: string;
-  readonly description: string;
-  readonly display: string;
-  readonly required: boolean;
-  readonly mask: boolean;
+  readonly value?: string | null;
+  readonly default?: string | null;
+  readonly mode?: string | null;
+  readonly description?: string | null;
+  readonly display?: string | null;
+  readonly required?: boolean | null;
+  readonly mask?: boolean | null;
 }
 
 interface DockerTemplateInputArg {
   readonly name: string;
   readonly repository: string;
-  readonly network: string;
-  readonly privileged: boolean;
-  readonly shell: string;
+  readonly network?: string | null;
+  readonly privileged?: boolean | null;
+  readonly shell?: string | null;
   readonly overview?: string | null;
   readonly icon?: string | null;
   readonly webui?: string | null;
@@ -259,6 +259,7 @@ interface DockerTemplateInputArg {
   readonly postArgs?: string | null;
   readonly cpuset?: string | null;
   readonly fixedMac?: string | null;
+  readonly fixedIp?: string | null;
   readonly configs: readonly DockerTemplateConfigInputArg[];
 }
 
@@ -268,9 +269,9 @@ function mapTemplateInput(
   return {
     name: input.name,
     repository: input.repository,
-    network: input.network,
-    privileged: input.privileged,
-    shell: input.shell,
+    ...(input.network != null ? { network: input.network } : {}),
+    ...(input.privileged != null ? { privileged: input.privileged } : {}),
+    ...(input.shell != null ? { shell: input.shell } : {}),
     ...(input.overview != null ? { overview: input.overview } : {}),
     ...(input.icon != null ? { icon: input.icon } : {}),
     ...(input.webui != null ? { webui: input.webui } : {}),
@@ -282,17 +283,20 @@ function mapTemplateInput(
     ...(input.postArgs != null ? { postArgs: input.postArgs } : {}),
     ...(input.cpuset != null ? { cpuset: input.cpuset } : {}),
     ...(input.fixedMac != null ? { fixedMac: input.fixedMac } : {}),
+    ...(input.fixedIp != null ? { fixedIp: input.fixedIp } : {}),
+    // Same omit-when-absent shape as the fields above: an unset attribute
+    // must not reach xml.ts as null.
     configs: input.configs.map((config) => ({
       name: config.name,
       target: config.target,
       type: config.type,
-      value: config.value,
-      default: config.default,
-      mode: config.mode,
-      description: config.description,
-      display: config.display,
-      required: config.required,
-      mask: config.mask,
+      ...(config.value != null ? { value: config.value } : {}),
+      ...(config.default != null ? { default: config.default } : {}),
+      ...(config.mode != null ? { mode: config.mode } : {}),
+      ...(config.description != null ? { description: config.description } : {}),
+      ...(config.display != null ? { display: config.display } : {}),
+      ...(config.required != null ? { required: config.required } : {}),
+      ...(config.mask != null ? { mask: config.mask } : {}),
     })),
   };
 }

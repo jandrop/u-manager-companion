@@ -18,6 +18,7 @@ import type { DockerClient } from '../../../platform/docker-client.js';
 import type { StreamedProcessRunner } from '../../../platform/process-runner.js';
 import { getSnapshot } from '../../../operations/registry.js';
 import { editDockerTemplate, type WriteTemplateFile } from '../edit.js';
+import type { ReadTemplateFile } from '../read-template.js';
 
 function makeFakeDockerClient(overrides: Partial<DockerClient> = {}): DockerClient {
   return {
@@ -55,6 +56,12 @@ function makeFakeAudit(): AuditLogger {
   return { recordAuditEvent: vi.fn() };
 }
 
+/** Default fake reader: no prior template on disk (ENOENT), matching most
+ * existing tests' fixtures that don't care about fixedIp preservation. */
+function makeFakeReadTemplateFile(): ReadTemplateFile {
+  return vi.fn().mockRejectedValue({ code: 'ENOENT' });
+}
+
 const baseInput = {
   name: 'plex',
   repository: 'lscr.io/linuxserver/plex',
@@ -70,6 +77,7 @@ describe('editDockerTemplate', () => {
       dockerClient: makeFakeDockerClient(),
       runRebuildContainer: makeFakeRebuild(),
       writeTemplateFile,
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit,
       caller: { id: 'u1', name: 'admin' },
     });
@@ -85,6 +93,7 @@ describe('editDockerTemplate', () => {
       dockerClient: makeFakeDockerClient(),
       runRebuildContainer: makeFakeRebuild(),
       writeTemplateFile,
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit,
       caller: { id: 'u1', name: 'admin' },
     });
@@ -121,6 +130,7 @@ describe('editDockerTemplate', () => {
       dockerClient,
       runRebuildContainer: makeFakeRebuild(),
       writeTemplateFile,
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit: makeFakeAudit(),
       caller: { id: 'u1', name: 'admin' },
     });
@@ -147,6 +157,7 @@ describe('editDockerTemplate', () => {
       dockerClient,
       runRebuildContainer: makeFakeRebuild(),
       writeTemplateFile: vi.fn().mockResolvedValue(undefined),
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit: makeFakeAudit(),
       caller: { id: 'u1', name: 'admin' },
     });
@@ -171,6 +182,7 @@ describe('editDockerTemplate', () => {
       dockerClient,
       runRebuildContainer: makeFakeRebuild(),
       writeTemplateFile: vi.fn().mockResolvedValue(undefined),
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit: makeFakeAudit(),
       caller: { id: 'u1', name: 'admin' },
     });
@@ -202,6 +214,7 @@ describe('editDockerTemplate', () => {
       dockerClient,
       runRebuildContainer: makeFakeRebuild(),
       writeTemplateFile: vi.fn().mockResolvedValue(undefined),
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit: makeFakeAudit(),
       caller: { id: 'u1', name: 'admin' },
     });
@@ -232,6 +245,7 @@ describe('editDockerTemplate', () => {
       dockerClient,
       runRebuildContainer: makeFakeRebuild(),
       writeTemplateFile: vi.fn().mockResolvedValue(undefined),
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit: makeFakeAudit(),
       caller: { id: 'u1', name: 'admin' },
     });
@@ -249,6 +263,7 @@ describe('editDockerTemplate', () => {
           dockerClient: makeFakeDockerClient(),
           runRebuildContainer: makeFakeRebuild(),
           writeTemplateFile: vi.fn().mockResolvedValue(undefined),
+          readTemplateFile: makeFakeReadTemplateFile(),
           audit: makeFakeAudit(),
           caller: { id: 'u1', name: 'admin' },
         },
@@ -261,12 +276,130 @@ describe('editDockerTemplate', () => {
       dockerClient: makeFakeDockerClient(),
       runRebuildContainer: makeFakeRebuild(1),
       writeTemplateFile: vi.fn().mockResolvedValue(undefined),
+      readTemplateFile: makeFakeReadTemplateFile(),
       audit: makeFakeAudit(),
       caller: { id: 'u1', name: 'admin' },
     });
 
     await vi.waitFor(() => {
       expect(getSnapshot(op.id)?.status).toBe('FAILED');
+    });
+  });
+
+  describe('fixedIp preserve-on-edit (regression gate)', () => {
+    function priorXmlWith(fixedIp: string): string {
+      return [
+        '<?xml version="1.0"?>',
+        '<Container version="2">',
+        '  <Name>plex</Name>',
+        '  <Repository>lscr.io/linuxserver/plex</Repository>',
+        `  <MyIP>${fixedIp}</MyIP>`,
+        '</Container>',
+        '',
+      ].join('\n');
+    }
+
+    it('S5: input omitting fixedIp preserves the on-disk value', async () => {
+      const writeTemplateFile: WriteTemplateFile = vi.fn().mockResolvedValue(undefined);
+      const readTemplateFile: ReadTemplateFile = vi.fn().mockResolvedValue(priorXmlWith('192.168.1.2'));
+
+      const op = editDockerTemplate(baseInput, {
+        dockerClient: makeFakeDockerClient(),
+        runRebuildContainer: makeFakeRebuild(),
+        writeTemplateFile,
+        readTemplateFile,
+        audit: makeFakeAudit(),
+        caller: { id: 'u1', name: 'admin' },
+      });
+
+      await vi.waitFor(() => {
+        expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+      });
+      expect(writeTemplateFile).toHaveBeenCalledWith('plex', expect.stringContaining('<MyIP>192.168.1.2</MyIP>'));
+    });
+
+    it('S6: an explicit input fixedIp overrides the on-disk value', async () => {
+      const writeTemplateFile: WriteTemplateFile = vi.fn().mockResolvedValue(undefined);
+      const readTemplateFile: ReadTemplateFile = vi.fn().mockResolvedValue(priorXmlWith('192.168.1.2'));
+
+      const op = editDockerTemplate(
+        { ...baseInput, fixedIp: '10.0.0.9' },
+        {
+          dockerClient: makeFakeDockerClient(),
+          runRebuildContainer: makeFakeRebuild(),
+          writeTemplateFile,
+          readTemplateFile,
+          audit: makeFakeAudit(),
+          caller: { id: 'u1', name: 'admin' },
+        },
+      );
+
+      await vi.waitFor(() => {
+        expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+      });
+      expect(writeTemplateFile).toHaveBeenCalledWith('plex', expect.stringContaining('<MyIP>10.0.0.9</MyIP>'));
+    });
+
+    it('S7: an unreadable (ENOENT) prior template still completes the edit, writing the empty placeholder', async () => {
+      const writeTemplateFile: WriteTemplateFile = vi.fn().mockResolvedValue(undefined);
+      const readTemplateFile: ReadTemplateFile = vi.fn().mockRejectedValue({ code: 'ENOENT' });
+
+      const op = editDockerTemplate(baseInput, {
+        dockerClient: makeFakeDockerClient(),
+        runRebuildContainer: makeFakeRebuild(),
+        writeTemplateFile,
+        readTemplateFile,
+        audit: makeFakeAudit(),
+        caller: { id: 'u1', name: 'admin' },
+      });
+
+      await vi.waitFor(() => {
+        expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+      });
+      expect(writeTemplateFile).toHaveBeenCalledWith('plex', expect.stringContaining('<MyIP/>'));
+    });
+
+    it('S8: a non-ENOENT read failure degrades quietly (edit still succeeds, one progress line logged)', async () => {
+      const writeTemplateFile: WriteTemplateFile = vi.fn().mockResolvedValue(undefined);
+      const readTemplateFile: ReadTemplateFile = vi.fn().mockRejectedValue({ code: 'EACCES' });
+
+      const op = editDockerTemplate(baseInput, {
+        dockerClient: makeFakeDockerClient(),
+        runRebuildContainer: makeFakeRebuild(),
+        writeTemplateFile,
+        readTemplateFile,
+        audit: makeFakeAudit(),
+        caller: { id: 'u1', name: 'admin' },
+      });
+
+      await vi.waitFor(() => {
+        expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+      });
+      expect(writeTemplateFile).toHaveBeenCalledWith('plex', expect.stringContaining('<MyIP/>'));
+      const output = getSnapshot(op.id)?.output ?? [];
+      expect(output.some((line) => /fixed ip|MyIP/i.test(line))).toBe(true);
+    });
+
+    it('S9: an empty-string input fixedIp behaves as absent, preserving the on-disk value', async () => {
+      const writeTemplateFile: WriteTemplateFile = vi.fn().mockResolvedValue(undefined);
+      const readTemplateFile: ReadTemplateFile = vi.fn().mockResolvedValue(priorXmlWith('192.168.1.2'));
+
+      const op = editDockerTemplate(
+        { ...baseInput, fixedIp: '' },
+        {
+          dockerClient: makeFakeDockerClient(),
+          runRebuildContainer: makeFakeRebuild(),
+          writeTemplateFile,
+          readTemplateFile,
+          audit: makeFakeAudit(),
+          caller: { id: 'u1', name: 'admin' },
+        },
+      );
+
+      await vi.waitFor(() => {
+        expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+      });
+      expect(writeTemplateFile).toHaveBeenCalledWith('plex', expect.stringContaining('<MyIP>192.168.1.2</MyIP>'));
     });
   });
 });

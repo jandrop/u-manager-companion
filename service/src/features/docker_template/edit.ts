@@ -28,9 +28,10 @@ import {
 import type { AuditCaller, AuditLogger } from '../../audit.js';
 import { isDockerApiError, type DockerClient } from '../../platform/docker-client.js';
 import type { StreamedProcessRunner } from '../../platform/process-runner.js';
-import { buildTemplateXml, sanitiseContainerName, type DockerTemplateXmlInput } from './xml.js';
+import { buildTemplateXml, parseTemplateXml, sanitiseContainerName, type DockerTemplateXmlInput } from './xml.js';
 import { DOCKER_INSTALL_CHANNEL_PREFIX, REBUILD_CONTAINER_CLI, TEMPLATES_USER_DIR } from './install.js';
 import type { DockerInstallSubject } from './install.js';
+import type { ReadTemplateFile } from './read-template.js';
 
 export type DockerTemplateEditInput = DockerTemplateXmlInput & { readonly name: string };
 
@@ -42,6 +43,7 @@ export interface EditDockerTemplateDeps {
   readonly dockerClient: DockerClient;
   readonly runRebuildContainer: StreamedProcessRunner;
   readonly writeTemplateFile: WriteTemplateFile;
+  readonly readTemplateFile: ReadTemplateFile;
   readonly audit: AuditLogger;
   readonly caller: AuditCaller;
 }
@@ -127,6 +129,30 @@ async function rebuildContainer(
   }
 }
 
+function isEnoent(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT';
+}
+
+/** Reads the on-disk template's fixedIp to preserve it when the caller
+ * omits one. Never throws -- by the time this runs the container has
+ * already been stopped and removed, so a read failure must degrade to
+ * "treat as absent" rather than fail the whole edit. */
+async function readPriorFixedIp(
+  operationId: string,
+  name: string,
+  deps: EditDockerTemplateDeps,
+): Promise<string | null> {
+  try {
+    const xml = await deps.readTemplateFile(templatePath(name));
+    return parseTemplateXml(xml).fixedIp;
+  } catch (error) {
+    if (!isEnoent(error)) {
+      appendLine(operationId, `Could not read prior fixed IP for '${name}' -- proceeding without it`);
+    }
+    return null;
+  }
+}
+
 async function runUpdate(
   operationId: string,
   input: DockerTemplateEditInput,
@@ -136,7 +162,12 @@ async function runUpdate(
   await stopContainer(operationId, name, deps.dockerClient);
   await removeContainer(operationId, name, deps.dockerClient);
 
-  const xml = buildTemplateXml(input, name);
+  const priorFixedIp = await readPriorFixedIp(operationId, name, deps);
+  const effectiveFixedIp = input.fixedIp || priorFixedIp || undefined;
+  const xml = buildTemplateXml(
+    effectiveFixedIp ? { ...input, fixedIp: effectiveFixedIp } : input,
+    name,
+  );
   await deps.writeTemplateFile(name, xml);
   appendLine(operationId, `Wrote template ${templatePath(name)}`);
 

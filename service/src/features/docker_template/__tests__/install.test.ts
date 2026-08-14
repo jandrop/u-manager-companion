@@ -216,6 +216,27 @@ describe('installDockerTemplate', () => {
     });
   });
 
+  it('writes a caller-provided fixedIp verbatim, with no prior read (fresh install has nothing to preserve)', async () => {
+    const writeTemplateFile: WriteTemplateFile = vi.fn().mockResolvedValue(undefined);
+    const audit = makeFakeAudit();
+
+    const op = installDockerTemplate(
+      { ...baseInput, fixedIp: '192.168.1.50' },
+      {
+        dockerClient: makeFakeDockerClient(),
+        runRebuildContainer: makeFakeRebuild(),
+        writeTemplateFile,
+        audit,
+        caller: { id: 'u1', name: 'admin' },
+      },
+    );
+
+    await vi.waitFor(() => {
+      expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+    });
+    expect(writeTemplateFile).toHaveBeenCalledWith('plex', expect.stringContaining('<MyIP>192.168.1.50</MyIP>'));
+  });
+
   it('transitions to FAILED when writing the template file rejects', async () => {
     const writeTemplateFile: WriteTemplateFile = vi.fn().mockRejectedValue(new Error('disk full'));
     const audit = makeFakeAudit();

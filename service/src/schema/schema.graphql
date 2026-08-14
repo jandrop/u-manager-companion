@@ -212,13 +212,13 @@ input DockerTemplateConfigInput {
   name: String!
   type: DockerConfigEntryType!
   target: String!
-  value: String!
-  default: String!
-  mode: String!
-  description: String!
-  display: String!
-  required: Boolean!
-  mask: Boolean!
+  value: String
+  default: String
+  mode: String
+  description: String
+  display: String
+  required: Boolean
+  mask: Boolean
 }
 
 "Config entry read back from an on-disk template. Nullability matches the bundle patch's DockerConfigEntry -- a self-closed <Config/> has no value, and a missing attribute is not an empty string."
@@ -253,6 +253,8 @@ type DockerTemplate {
   postArgs: String
   cpuset: String
   fixedMac: String
+  "Fixed IP from <MyIP>, for containers on a custom network. Empty tag reads as \"\", missing tag as null."
+  fixedIp: String
   "Elements are nullable so one bad entry doesn't nullify the whole template."
   configs: [DockerTemplateConfig]!
 }
@@ -261,9 +263,9 @@ type DockerTemplate {
 input DockerTemplateInput {
   name: String!
   repository: String!
-  network: String!
-  privileged: Boolean!
-  shell: String!
+  network: String
+  privileged: Boolean
+  shell: String
   overview: String
   icon: String
   webui: String
@@ -275,6 +277,8 @@ input DockerTemplateInput {
   postArgs: String
   cpuset: String
   fixedMac: String
+  "Omitted or empty preserves the on-disk value on edit; install writes it verbatim."
+  fixedIp: String
   configs: [DockerTemplateConfigInput!]!
 }
 

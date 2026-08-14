@@ -86,6 +86,7 @@ describe('DockerConfigEntryType -- read path (serialize)', () => {
       postArgs: null,
       cpuset: null,
       fixedMac: null,
+      fixedIp: null,
       configs: [
         {
           name: 'c1',
@@ -161,6 +162,7 @@ describe('DockerConfigEntryType -- read path (serialize)', () => {
       postArgs: null,
       cpuset: null,
       fixedMac: null,
+      fixedIp: null,
       configs: [],
     });
 
@@ -451,6 +453,55 @@ describe('DockerConfigEntryType -- write path (parseValue/parseLiteral)', () => 
     expect(combinedMessages).toMatch(/BOGUS/);
     expect(result.data).toBeUndefined();
     expect(installDockerTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe('DockerTemplate/DockerTemplateInput -- fixedIp field shape', () => {
+  it('S11: both fixedIp fields are nullable String, resolving end-to-end through an install-write + dockerTemplate-read round trip', async () => {
+    const snapshot = createOperation('DOCKER_INSTALL', { containerName: 'plex', repository: 'r' });
+    const installDockerTemplate = vi.fn().mockReturnValue(snapshot);
+
+    const mutationResult = await graphql({
+      schema: buildExecutableSchema(),
+      source: INSTALL_MUTATION,
+      variableValues: {
+        input: {
+          name: 'plex',
+          repository: 'r',
+          network: 'bridge',
+          privileged: false,
+          shell: 'sh',
+          fixedIp: '10.0.0.7',
+          configs: [],
+        },
+      },
+      contextValue: makeContext({ installDockerTemplate }),
+    });
+    expect(mutationResult.errors).toBeUndefined();
+
+    const mappedInput = installDockerTemplate.mock.calls[0]![0] as Parameters<typeof buildTemplateXml>[0] & {
+      name: string;
+    };
+    expect(mappedInput.fixedIp).toBe('10.0.0.7');
+    const xml = buildTemplateXml(mappedInput, mappedInput.name);
+    const parsed = parseTemplateXml(xml);
+    const readDockerTemplate = vi.fn().mockResolvedValue(parsed);
+
+    const queryResult = await graphql({
+      schema: buildExecutableSchema(),
+      source: `
+        query DockerTemplateQuery($name: String!) {
+          dockerTemplate(name: $name) {
+            fixedIp
+          }
+        }
+      `,
+      variableValues: { name: 'plex' },
+      contextValue: makeContext({ readDockerTemplate }),
+    });
+
+    expect(queryResult.errors).toBeUndefined();
+    expect((queryResult.data as Record<string, { fixedIp: string }>)['dockerTemplate']!.fixedIp).toBe('10.0.0.7');
   });
 });
 

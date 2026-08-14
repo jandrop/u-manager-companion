@@ -69,6 +69,9 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   'plugins.installedDetailed': { resource: 'CONFIG', action: 'update' },
   shares: { resource: 'SHARE', action: 'update' },
   diskThresholds: { resource: 'DISPLAY', action: 'update' },
+  // Never checked -- a detection flag, not an operation. Present only
+  // because this map is total over CapabilityKey.
+  'docker.templateFixedIp': { resource: 'DOCKER', action: 'update' },
 };
 
 function permissionKey(permission: RequiredPermission): string {
