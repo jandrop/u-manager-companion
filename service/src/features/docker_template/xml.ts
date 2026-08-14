@@ -60,6 +60,7 @@ export interface DockerTemplateXmlInput {
   readonly postArgs?: string;
   readonly cpuset?: string;
   readonly fixedMac?: string;
+  readonly fixedIp?: string;
   readonly configs: readonly DockerConfigEntry[];
 }
 
@@ -82,6 +83,7 @@ export interface ParsedDockerTemplate {
   readonly postArgs: string | null;
   readonly cpuset: string | null;
   readonly fixedMac: string | null;
+  readonly fixedIp: string | null;
   readonly configs: readonly ParsedDockerConfigEntry[];
 }
 
@@ -145,10 +147,9 @@ function pushTag(lines: string[], tag: string, value: string | undefined): void 
 }
 
 /**
- * Renders the full `my-<Name>.xml` document. Tag order is FIXED,
- * including the empty `<MyIP/>` placeholder (kept for on-disk format
- * parity even though this project never populates it) and `<MyMAC>` being
- * OMITTED ENTIRELY (not just self-closed) when fixedMac is absent.
+ * Renders the full `my-<Name>.xml` document. Tag order is FIXED. `<MyIP>`
+ * is ALWAYS emitted (self-closed when empty, for on-disk format parity);
+ * `<MyMAC>` is OMITTED ENTIRELY (not just self-closed) when absent.
  */
 export function buildTemplateXml(input: DockerTemplateXmlInput, name: string): string {
   const lines: string[] = [];
@@ -158,7 +159,7 @@ export function buildTemplateXml(input: DockerTemplateXmlInput, name: string): s
   pushTag(lines, 'Repository', input.repository);
   pushTag(lines, 'Registry', input.registry);
   pushTag(lines, 'Network', input.network ?? 'bridge');
-  pushTag(lines, 'MyIP', '');
+  pushTag(lines, 'MyIP', input.fixedIp);
   pushTag(lines, 'Shell', input.shell ?? 'sh');
   pushTag(lines, 'Privileged', input.privileged ? 'true' : 'false');
   pushTag(lines, 'Support', input.support);
@@ -243,6 +244,7 @@ export function parseTemplateXml(xml: string): ParsedDockerTemplate {
     postArgs: readTag(xml, 'PostArgs'),
     cpuset: readTag(xml, 'CPUset'),
     fixedMac: readTag(xml, 'MyMAC'),
+    fixedIp: readTag(xml, 'MyIP'),
     configs,
   };
 }

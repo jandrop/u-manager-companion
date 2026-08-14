@@ -39,17 +39,11 @@
 import { createServer, type IncomingMessage, type Server as HttpServer } from 'node:http';
 import { ApolloServer, HeaderMap } from '@apollo/server';
 import { unwrapResolverError } from '@apollo/server/errors';
-import { makeExecutableSchema } from '@graphql-tools/schema';
-import type { IResolvers } from '@graphql-tools/utils';
-// @ts-expect-error -- .graphql has no type declaration; esbuild's text loader
-// (build/bundle.mjs) inlines its content as a string at bundle time, and
-// ts-node/vitest resolve it via tsconfig's resolveJsonModule-adjacent raw
-// import handled by the custom loader below in dev/test (see importSdl()).
-import schemaGraphqlSourceText from './schema/schema.graphql';
 import { useServer } from 'graphql-ws/lib/use/ws';
 import { WebSocketServer, type WebSocket } from 'ws';
 
-import { resolvers, type GraphqlContext, type FeatureModuleDeps } from './resolvers.js';
+import { buildExecutableSchema } from './schema/build-schema.js';
+import { type GraphqlContext, type FeatureModuleDeps } from './resolvers.js';
 import {
   createContextCache,
   extractKeyFromHttpHeaders,
@@ -103,24 +97,6 @@ const HOST = '127.0.0.1';
 // specifier -- convenient for the bundle-pipeline smoke test, which only has
 // `require(bundleOut)` (the flattened single-file entry) to work with.
 export { resolveCompanionConfig };
-
-/**
- * Builds the executable GraphQL schema from the SDL text + resolvers.ts's
- * resolver map. `@graphql-tools/schema`'s `makeExecutableSchema` is used
- * instead of `buildSchema` + manual field assignment because it accepts the
- * resolver map SHAPE resolvers.ts already exports (nested per-type resolver
- * objects) directly.
- */
-function buildExecutableSchema() {
-  return makeExecutableSchema({
-    typeDefs: schemaGraphqlSourceText as unknown as string,
-    // resolvers.ts's map is intentionally typed narrowly against
-    // GraphqlContext for call-site safety; makeExecutableSchema's own typing
-    // is deliberately broad (any valid GraphQL resolver map shape), so a
-    // structural cast is required at this single seam.
-    resolvers: resolvers as unknown as IResolvers,
-  });
-}
 
 /** Injectable template-file writer -- production wiring shells to
  * fs/promises writeFile after ensuring the templates-user directory exists.
@@ -257,6 +233,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
         dockerClient,
         runRebuildContainer: runStreamedProcess,
         writeTemplateFile: writeTemplate,
+        readTemplateFile,
         audit,
         caller,
       }),

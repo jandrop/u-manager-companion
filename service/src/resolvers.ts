@@ -231,23 +231,23 @@ const PLUGIN_INSTALL_CHANNEL_PREFIX = 'PLUGIN_INSTALL';
 
 interface DockerTemplateConfigInputArg {
   readonly name: string;
-  readonly type: string;
+  readonly type: DockerConfigEntryTypeXml;
   readonly target: string;
-  readonly value: string;
-  readonly default: string;
-  readonly mode: string;
-  readonly description: string;
-  readonly display: string;
-  readonly required: boolean;
-  readonly mask: boolean;
+  readonly value?: string | null;
+  readonly default?: string | null;
+  readonly mode?: string | null;
+  readonly description?: string | null;
+  readonly display?: string | null;
+  readonly required?: boolean | null;
+  readonly mask?: boolean | null;
 }
 
 interface DockerTemplateInputArg {
   readonly name: string;
   readonly repository: string;
-  readonly network: string;
-  readonly privileged: boolean;
-  readonly shell: string;
+  readonly network?: string | null;
+  readonly privileged?: boolean | null;
+  readonly shell?: string | null;
   readonly overview?: string | null;
   readonly icon?: string | null;
   readonly webui?: string | null;
@@ -259,18 +259,9 @@ interface DockerTemplateInputArg {
   readonly postArgs?: string | null;
   readonly cpuset?: string | null;
   readonly fixedMac?: string | null;
+  readonly fixedIp?: string | null;
   readonly configs: readonly DockerTemplateConfigInputArg[];
 }
-
-/** SDL DockerConfigEntryType wire values (upper-case) -> the XML title-case
- * form xml.ts's buildTemplateXml expects. */
-const CONFIG_TYPE_WIRE_TO_XML: Readonly<Record<string, DockerConfigEntryTypeXml>> = {
-  PATH: 'Path',
-  PORT: 'Port',
-  VARIABLE: 'Variable',
-  LABEL: 'Label',
-  DEVICE: 'Device',
-};
 
 function mapTemplateInput(
   input: DockerTemplateInputArg,
@@ -278,9 +269,9 @@ function mapTemplateInput(
   return {
     name: input.name,
     repository: input.repository,
-    network: input.network,
-    privileged: input.privileged,
-    shell: input.shell,
+    ...(input.network != null ? { network: input.network } : {}),
+    ...(input.privileged != null ? { privileged: input.privileged } : {}),
+    ...(input.shell != null ? { shell: input.shell } : {}),
     ...(input.overview != null ? { overview: input.overview } : {}),
     ...(input.icon != null ? { icon: input.icon } : {}),
     ...(input.webui != null ? { webui: input.webui } : {}),
@@ -292,17 +283,20 @@ function mapTemplateInput(
     ...(input.postArgs != null ? { postArgs: input.postArgs } : {}),
     ...(input.cpuset != null ? { cpuset: input.cpuset } : {}),
     ...(input.fixedMac != null ? { fixedMac: input.fixedMac } : {}),
+    ...(input.fixedIp != null ? { fixedIp: input.fixedIp } : {}),
+    // Same omit-when-absent shape as the fields above: an unset attribute
+    // must not reach xml.ts as null.
     configs: input.configs.map((config) => ({
       name: config.name,
       target: config.target,
-      type: CONFIG_TYPE_WIRE_TO_XML[config.type] ?? 'Variable',
-      value: config.value,
-      default: config.default,
-      mode: config.mode,
-      description: config.description,
-      display: config.display,
-      required: config.required,
-      mask: config.mask,
+      type: config.type,
+      ...(config.value != null ? { value: config.value } : {}),
+      ...(config.default != null ? { default: config.default } : {}),
+      ...(config.mode != null ? { mode: config.mode } : {}),
+      ...(config.description != null ? { description: config.description } : {}),
+      ...(config.display != null ? { display: config.display } : {}),
+      ...(config.required != null ? { required: config.required } : {}),
+      ...(config.mask != null ? { mask: config.mask } : {}),
     })),
   };
 }
@@ -567,6 +561,13 @@ export const resolvers = {
       },
     },
   },
+
+  // graphql-js uses ONE value map for BOTH directions: serialize() on
+  // DockerTemplateConfig.type and parseValue/parseLiteral on
+  // DockerTemplateConfigInput.type. xml.ts owns the spellings.
+  DockerConfigEntryType: {
+    PATH: 'Path', PORT: 'Port', VARIABLE: 'Variable', LABEL: 'Label', DEVICE: 'Device',
+  } satisfies Record<string, DockerConfigEntryTypeXml>,
 };
 
 /** Exported for server.ts -- the plugin-install channel prefix used by a

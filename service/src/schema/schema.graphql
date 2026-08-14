@@ -212,36 +212,36 @@ input DockerTemplateConfigInput {
   name: String!
   type: DockerConfigEntryType!
   target: String!
-  value: String!
-  default: String!
-  mode: String!
-  description: String!
-  display: String!
-  required: Boolean!
-  mask: Boolean!
+  value: String
+  default: String
+  mode: String
+  description: String
+  display: String
+  required: Boolean
+  mask: Boolean
 }
 
-"Config entry as read back from an on-disk template (dockerTemplate query). Field set matches DockerTemplateConfigInput's output-side mirror in unraid_graphql_docker_template_queries.dart's dockerTemplateQuery selection."
+"Config entry read back from an on-disk template. Nullability matches the bundle patch's DockerConfigEntry -- a self-closed <Config/> has no value, and a missing attribute is not an empty string."
 type DockerTemplateConfig {
   name: String!
   type: DockerConfigEntryType!
   target: String!
-  value: String!
-  default: String!
-  mode: String!
-  description: String!
-  display: String!
-  required: Boolean!
-  mask: Boolean!
+  value: String
+  default: String
+  mode: String
+  description: String
+  display: String
+  required: Boolean
+  mask: Boolean
 }
 
 "Saved user template for an existing Docker container, as read back by the dockerTemplate(name) query. Field set mirrors dockerTemplateQuery's selection in unraid_graphql_docker_template_queries.dart exactly."
 type DockerTemplate {
   name: String!
   repository: String!
-  network: String!
-  privileged: Boolean!
-  shell: String!
+  network: String
+  privileged: Boolean
+  shell: String
   overview: String
   icon: String
   webui: String
@@ -253,16 +253,19 @@ type DockerTemplate {
   postArgs: String
   cpuset: String
   fixedMac: String
-  configs: [DockerTemplateConfig!]!
+  "Fixed IP from <MyIP>, for containers on a custom network. Empty tag reads as \"\", missing tag as null."
+  fixedIp: String
+  "Elements are nullable so one bad entry doesn't nullify the whole template."
+  configs: [DockerTemplateConfig]!
 }
 
 "Install/edit payload -- shape matches DockerTemplateRemoteEntity's _templateToGraphqlInput mapping in the app's docker_template_data_source.dart exactly (field-for-field, including nullability)."
 input DockerTemplateInput {
   name: String!
   repository: String!
-  network: String!
-  privileged: Boolean!
-  shell: String!
+  network: String
+  privileged: Boolean
+  shell: String
   overview: String
   icon: String
   webui: String
@@ -274,6 +277,8 @@ input DockerTemplateInput {
   postArgs: String
   cpuset: String
   fixedMac: String
+  "Omitted or empty preserves the on-disk value on edit; install writes it verbatim."
+  fixedIp: String
   configs: [DockerTemplateConfigInput!]!
 }
 

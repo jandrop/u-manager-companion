@@ -124,6 +124,7 @@ describe('CAPABILITY_KEYS', () => {
         'plugins.installedDetailed',
         'shares',
         'diskThresholds',
+        'docker.templateFixedIp',
       ].sort(),
     );
   });
