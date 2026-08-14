@@ -31,7 +31,7 @@ import type { StreamedProcessRunner } from '../../platform/process-runner.js';
 import { buildTemplateXml, parseTemplateXml, sanitiseContainerName, type DockerTemplateXmlInput } from './xml.js';
 import { DOCKER_INSTALL_CHANNEL_PREFIX, REBUILD_CONTAINER_CLI, TEMPLATES_USER_DIR } from './install.js';
 import type { DockerInstallSubject } from './install.js';
-import type { ReadTemplateFile } from './read-template.js';
+import { isEnoent, type ReadTemplateFile } from './read-template.js';
 
 export type DockerTemplateEditInput = DockerTemplateXmlInput & { readonly name: string };
 
@@ -127,10 +127,6 @@ async function rebuildContainer(
   if (result.exitCode !== 0) {
     throw new Error(`rebuild_container exited with code ${result.exitCode}`);
   }
-}
-
-function isEnoent(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT';
 }
 
 /** Reads the on-disk template's fixedIp to preserve it when the caller

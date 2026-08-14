@@ -25,7 +25,7 @@ function templatePath(name: string): string {
   return `${TEMPLATES_USER_DIR}/my-${name}.xml`;
 }
 
-function isEnoent(error: unknown): boolean {
+export function isEnoent(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENOENT';
 }
 

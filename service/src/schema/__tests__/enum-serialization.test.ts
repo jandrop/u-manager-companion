@@ -14,18 +14,8 @@
 import type { GraphQLEnumType } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 
-// vitest/vite-node resolves an ESM `import` of the `graphql` package to a
-// DIFFERENT module registry entry than the plain `require('graphql')`
-// `@graphql-tools/schema`'s CJS build (the one actually loaded here, since
-// this project is `"type": "commonjs"`) uses internally to construct its
-// `GraphQLSchema`. Executing a schema built by one against the `graphql()`
-// function imported by the other trips graphql-js's own `instanceof`-based
-// `isSchema()` guard: "Cannot use GraphQLSchema from another module or
-// realm." This split is a vitest/vite-node test-harness artifact only --
-// the real esbuild-bundled single-file production/SEA build has exactly one
-// `graphql` module instance, so `require` here (matching the CJS path
-// `@graphql-tools/schema` itself takes) is what keeps this test executing
-// against the SAME schema realm it built.
+// Must match the CJS `graphql` instance @graphql-tools/schema loads, or
+// graphql-js's isSchema() guard rejects the schema. vite-node only.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { graphql } = require('graphql') as typeof import('graphql');
 
