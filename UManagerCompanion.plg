@@ -387,7 +387,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <URL>https://github.com/&github;/releases/download/&version;/companion-service-&version;.cjs</URL>
 <!-- PLACEHOLDER: real hash computed by scripts/build.sh once the service
      build output is included in the release pipeline. -->
-<SHA256>d0ab67de17e33ad226102416a19b8a813494348af3d77d4ae41885a551876781</SHA256>
+<SHA256>b481b1cbcf864b500175f4a365c50e0bd91023cdabb6e81c097b93e15c8687c3</SHA256>
 </FILE>
 
 <!-- Runs on install AND on every boot (Unraid replays plg install on boot).
