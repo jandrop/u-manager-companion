@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.08.06.1">
+<!ENTITY version "2026.08.14.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,12 @@
 
 <CHANGES>
 <![CDATA[
+###2026.08.14.1
+- Fixed the container template screen failing to load for most containers.
+  It now returns the same data the rest of the app already got.
+- Editing a container no longer wipes its fixed IP address. The address is
+  also readable now, alongside the fixed MAC.
+
 ###2026.08.06.1
 - Fixed API keys created with specific permissions being refused every
   action they were granted. Only full-access keys worked.
