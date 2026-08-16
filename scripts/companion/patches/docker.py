@@ -1,14 +1,10 @@
 """Docker resolver patches.
 
-* `docker-stats`: removes the old dockerode override we used to inject.
-  Upstream fixed the frozen counters, and the override now breaks the
-  subscription outright, so this only cleans up already-patched bundles.
-* `docker-stats-ansi`: widen the ANSI strip in `processStatsLine` so the
-  cursor-home escape `docker stats` writes per refresh frame stops
-  corrupting the first container's ID.
-* `docker-logs`: capture both stdout and stderr from `docker logs`.
-* `docker-refresh`: refresh the update-status cache after an
-  `updateContainer` mutation so the badge clears immediately.
+* `docker-stats`: strip the old dockerode override from patched bundles.
+* `docker-stats-ansi`: widen the ANSI strip so cursor-home stops corrupting
+  the first container id.
+* `docker-logs`: capture stderr as well as stdout from `docker logs`.
+* `docker-refresh`: refresh the update-status cache after `updateContainer`.
 """
 from __future__ import annotations
 
@@ -25,23 +21,12 @@ DOCKER_STATS_END = "\n})();\n"
 def remove_docker_stats_override() -> bool:
     """Strip the old dockerode override out of an already-patched bundle.
 
-    We used to replace `DockerStatsService.prototype.startStatsStream` so
-    the stats subscription streamed from the Docker socket instead of the
-    `docker stats` CLI, because upstream froze `NetIO`/`BlockIO` at
-    `0B / 0B` (unraid/api #2007 and #2008).
+    Upstream fixed the frozen counters (unraid/api #2007, #2008). On 4.37.1
+    the override is harmful: its `listContainers()` never resolves against
+    the API's shared dockerode singleton, so the subscription emits nothing.
 
-    Those are fixed upstream. On 4.37.1 the native CLI source reports live
-    counters again, and the override is now actively harmful: its
-    `await docker.listContainers()` never resolves against the shared
-    dockerode singleton the rest of the API uses, so no stats stream is
-    ever opened and `dockerContainerStats` emits nothing at all. Every
-    failure path inside it is swallowed, so the only trace is a
-    "Starting docker stats stream" line that logs before the hang.
-
-    Patches are applied in place with no pristine copy to fall back on, so
-    dropping the injection alone would leave every already-patched server
-    broken until its next unraid-api upgrade. This removes the block
-    instead, and is a no-op on a clean bundle.
+    Removes the block rather than just dropping the injection: patches apply
+    in place, so already-patched servers would stay broken otherwise.
     """
     bundle = find_bundle()
     if not bundle:
@@ -74,24 +59,14 @@ DOCKER_ANSI_NEW = r"line.replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, '')"
 def patch_docker_stats_ansi_bundle() -> bool:
     """Strip every CSI escape in `DockerStatsService.processStatsLine`.
 
-    Upstream cleans the line with `/\\x1B\\[[0-9;]*[mK]/g`, which only
-    covers SGR colours (`m`) and erase-line (`K`). Streaming `docker
-    stats` repaints a full table each interval and opens every frame with
-    erase-display plus cursor-home, so the first row arrives as
-    `ESC[J ESC[H <containerId>;<cpu>;...`. Captured on the wire:
+    Upstream's `/\\x1B\\[[0-9;]*[mK]/g` covers only SGR and erase-line, but
+    each refresh frame opens with erase-display plus cursor-home, so the
+    first row arrives as `ESC[J ESC[H <containerId>;...`. Those bytes
+    survive into the parsed id and no client can match it: measured 49 of
+    1078 events polluted, 21 clean ids for 22 containers.
 
-        0000000 033 [ H e 1 1 6 6 5 3 c 2 7 7 1 7 ...
-
-    `H` and `J` fall outside the `[mK]` class, so those two bytes survive
-    into the parsed `id` and the subscription publishes a container ID no
-    client can match against the one `docker.containers` returns. The
-    first container of every frame is always the same one, so it never
-    emits a usable sample at all: measured 49 of 1078 events polluted,
-    21 clean IDs for 22 running containers.
-
-    Widening the final-byte class to `[a-zA-Z]` (and allowing `?` in the
-    parameter bytes, for the private `ESC[?25l` cursor toggles) covers
-    the whole CSI family while leaving the rest of the parser untouched.
+    `[a-zA-Z]` covers the whole CSI family; `?` allows the private
+    `ESC[?25l` cursor toggles.
     """
     bundle = find_bundle()
     if not bundle:
@@ -175,26 +150,14 @@ DOCKER_REFRESH_NEW = (
 def patch_docker_refresh_bundle() -> bool:
     """Refresh the docker update-status cache after `updateContainer` returns.
 
-    The official `update_container` script writes the cache inline via
-    `setUpdateStatus()` when Docker emits a top-level "Digest:" event during
-    the pull stream. That event isn't guaranteed for every pull — when the
-    registry returns the digest under a per-layer `id` instead of a clean
-    top-level summary line, the cache keeps the pre-update `local` digest.
+    `update_container` only writes the cache when Docker emits a top-level
+    "Digest:" line, which some registries never send. The container then
+    keeps reporting UPDATE_AVAILABLE until the user hits "Check for updates".
 
-    The result is a freshly-updated container that the app's
-    `containerUpdateStatuses` query keeps reporting as UPDATE_AVAILABLE
-    until the user manually clicks "Check for updates" in the web UI
-    (which calls `DockerTemplates->getAllInfo(true)` → `reloadUpdateStatus`).
+    Calls `refreshDigests()` after the script finishes, wrapped in try/catch
+    so an offline registry never breaks the mutation itself.
 
-    This patch makes `DockerService.updateContainer` call
-    `dockerManifestService.refreshDigests()` after the script finishes, so
-    the cache is repopulated with fresh local/remote digests in the same
-    flow that already happens on "Check for updates". Wrapped in
-    try/catch so a refresh failure (offline registry, slow remote) never
-    breaks the mutation itself.
-
-    Tracked upstream: PR pending on the unraid-api fork
-    (`fix/docker-update-refresh-digests`).
+    Tracked upstream: `fix/docker-update-refresh-digests`.
     """
     bundle = find_bundle()
     if not bundle:
