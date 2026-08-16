@@ -3,6 +3,9 @@
 * `docker-stats`: removes the old dockerode override we used to inject.
   Upstream fixed the frozen counters, and the override now breaks the
   subscription outright, so this only cleans up already-patched bundles.
+* `docker-stats-ansi`: widen the ANSI strip in `processStatsLine` so the
+  cursor-home escape `docker stats` writes per refresh frame stops
+  corrupting the first container's ID.
 * `docker-logs`: capture both stdout and stderr from `docker logs`.
 * `docker-refresh`: refresh the update-status cache after an
   `updateContainer` mutation so the badge clears immediately.
@@ -63,6 +66,50 @@ def remove_docker_stats_override() -> bool:
         f.write(content)
     log(f"removed obsolete Docker stats override ({os.path.basename(bundle)})")
     return True
+
+DOCKER_ANSI_OLD = r"line.replace(/\x1B\[[0-9;]*[mK]/g, '')"
+DOCKER_ANSI_NEW = r"line.replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, '')"
+
+
+def patch_docker_stats_ansi_bundle() -> bool:
+    """Strip every CSI escape in `DockerStatsService.processStatsLine`.
+
+    Upstream cleans the line with `/\\x1B\\[[0-9;]*[mK]/g`, which only
+    covers SGR colours (`m`) and erase-line (`K`). Streaming `docker
+    stats` repaints a full table each interval and opens every frame with
+    erase-display plus cursor-home, so the first row arrives as
+    `ESC[J ESC[H <containerId>;<cpu>;...`. Captured on the wire:
+
+        0000000 033 [ H e 1 1 6 6 5 3 c 2 7 7 1 7 ...
+
+    `H` and `J` fall outside the `[mK]` class, so those two bytes survive
+    into the parsed `id` and the subscription publishes a container ID no
+    client can match against the one `docker.containers` returns. The
+    first container of every frame is always the same one, so it never
+    emits a usable sample at all: measured 49 of 1078 events polluted,
+    21 clean IDs for 22 running containers.
+
+    Widening the final-byte class to `[a-zA-Z]` (and allowing `?` in the
+    parameter bytes, for the private `ESC[?25l` cursor toggles) covers
+    the whole CSI family while leaving the rest of the parser untouched.
+    """
+    bundle = find_bundle()
+    if not bundle:
+        log("docker-stats-ansi patch: bundle not found")
+        return False
+    with open(bundle, "r") as f:
+        content = f.read()
+    if DOCKER_ANSI_NEW in content:
+        return False
+    if DOCKER_ANSI_OLD not in content:
+        log("docker-stats-ansi patch: original processStatsLine shape not found")
+        return False
+    content = content.replace(DOCKER_ANSI_OLD, DOCKER_ANSI_NEW, 1)
+    with open(bundle, "w") as f:
+        f.write(content)
+    log(f"fixed Docker stats ID corrupted by ANSI escapes ({os.path.basename(bundle)})")
+    return True
+
 
 DOCKER_LOGS_OLD = (
     "const { stdout } = await execa('docker', args);\n"
@@ -170,6 +217,7 @@ def patch_docker_refresh_bundle() -> bool:
 def apply() -> bool:
     return any([
         remove_docker_stats_override(),
+        patch_docker_stats_ansi_bundle(),
         patch_docker_logs_bundle(),
         patch_docker_refresh_bundle(),
     ])
