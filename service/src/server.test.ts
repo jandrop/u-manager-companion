@@ -259,6 +259,8 @@ function makeDockerClientStub(listContainers: DockerClient['listContainers']): D
     pull: unusedDockerCall,
     pruneVolumes: unusedDockerCall,
     listContainers,
+    streamContainerStats: unusedDockerCall,
+    streamContainerEvents: unusedDockerCall,
   };
 }
 

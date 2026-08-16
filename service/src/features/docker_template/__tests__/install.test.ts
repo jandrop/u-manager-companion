@@ -41,6 +41,8 @@ function makeFakeDockerClient(overrides: Partial<DockerClient> = {}): DockerClie
     }),
     pruneVolumes: vi.fn().mockResolvedValue(undefined),
     listContainers: vi.fn().mockResolvedValue([]),
+    streamContainerStats: vi.fn().mockRejectedValue(new Error('not used in this test')),
+    streamContainerEvents: vi.fn().mockRejectedValue(new Error('not used in this test')),
     ...overrides,
   };
 }

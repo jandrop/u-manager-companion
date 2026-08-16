@@ -82,13 +82,30 @@ describe('schema.graphql', () => {
     }
   });
 
-  it('declares the v1 Subscription field (dockerInstallUpdates)', () => {
+  it('declares the v1 Subscription fields (dockerInstallUpdates, dockerContainerStats)', () => {
     const sdl = readFileSync(SDL_PATH, 'utf8');
     const schema = buildSchema(sdl);
     const subscriptionType = schema.getSubscriptionType();
     expect(subscriptionType).toBeDefined();
     const fields = subscriptionType!.getFields();
-    expect(Object.keys(fields)).toEqual(['dockerInstallUpdates']);
+    expect(Object.keys(fields).sort()).toEqual(['dockerContainerStats', 'dockerInstallUpdates'].sort());
+  });
+
+  it('DockerContainerStatsSample declares exact-integer BigInt fields, nullable network/blkio', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+    const sampleType = schema.getType('DockerContainerStatsSample') as import('graphql').GraphQLObjectType;
+    expect(sampleType).toBeDefined();
+    const fields = sampleType.getFields();
+    expect(fields['id']!.type.toString()).toBe('ID!');
+    expect(fields['cpuPercent']!.type.toString()).toBe('Float!');
+    expect(fields['memUsedBytes']!.type.toString()).toBe('BigInt!');
+    expect(fields['memTotalBytes']!.type.toString()).toBe('BigInt!');
+    expect(fields['netRxBytes']!.type.toString()).toBe('BigInt');
+    expect(fields['netTxBytes']!.type.toString()).toBe('BigInt');
+    expect(fields['blkReadBytes']!.type.toString()).toBe('BigInt');
+    expect(fields['blkWriteBytes']!.type.toString()).toBe('BigInt');
+    expect(fields['sampledAtMs']!.type.toString()).toBe('BigInt!');
   });
 
   it('CompanionCapabilities carries schemaVersion, serviceVersion, features', () => {
@@ -125,6 +142,7 @@ describe('CAPABILITY_KEYS', () => {
         'shares',
         'diskThresholds',
         'docker.templateFixedIp',
+        'docker.stats',
       ].sort(),
     );
   });

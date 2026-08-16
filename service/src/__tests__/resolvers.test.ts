@@ -70,6 +70,7 @@ function makeContext(overrides: Partial<GraphqlContext['deps']> = {}, identity =
         hotssd: 55,
         maxssd: 65,
       }),
+      subscribeDockerContainerStats: vi.fn().mockResolvedValue((async function* () {})()),
       ...overrides,
     },
   };
@@ -348,5 +349,33 @@ describe('resolvers.Subscription.dockerInstallUpdates', () => {
 
     expect(publishSpy).toHaveBeenCalledWith(channelFor('DOCKER_INSTALL', snapshot.id));
     publishSpy.mockRestore();
+  });
+});
+
+describe('resolvers.Subscription.dockerContainerStats', () => {
+  it('delegates to deps.subscribeDockerContainerStats and adds no logic', async () => {
+    const batch = [
+      {
+        id: 'c1',
+        cpuPercent: 12.5,
+        memUsedBytes: 100,
+        memTotalBytes: 200,
+        netRxBytes: null,
+        netTxBytes: null,
+        blkReadBytes: null,
+        blkWriteBytes: null,
+        sampledAtMs: 1_700_000_000_000,
+      },
+    ];
+    const fakeIterable = { [Symbol.asyncIterator]: () => ({ next: async () => ({ done: true, value: undefined }) }) };
+    const subscribeDockerContainerStats = vi.fn().mockResolvedValue(fakeIterable);
+    const context = makeContext({ subscribeDockerContainerStats });
+
+    const result = await resolvers.Subscription.dockerContainerStats.subscribe({}, {}, context);
+
+    expect(subscribeDockerContainerStats).toHaveBeenCalledTimes(1);
+    expect(result).toBe(fakeIterable);
+    // Explicit resolve: payload -> payload, no reshaping (D7).
+    expect(resolvers.Subscription.dockerContainerStats.resolve(batch)).toBe(batch);
   });
 });

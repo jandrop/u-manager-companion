@@ -101,6 +101,9 @@ type Mutation {
 type Subscription {
   "Per-line/status-transition delta feed for a docker install, edit, or update operation. Same channel is fed by installDockerTemplate, updateDockerTemplate, updateContainerStream and updateAllContainersStream."
   dockerInstallUpdates(operationId: ID!): DockerInstallEvent!
+
+  "Live resource samples read straight from the Docker engine socket, one batch every two seconds for as long as at least one client is subscribed. Each batch carries the latest sample for every running container, so a container missing from a batch is a container that is no longer running. An empty list is a valid batch and means the engine is healthy with nothing running. Values are exact integers, never rounded into a display unit, so clients can delta consecutive samples into an accurate rate."
+  dockerContainerStats: [DockerContainerStatsSample!]!
 }
 
 # ---------------------------------------------------------------------------
@@ -181,6 +184,36 @@ type DockerInstallEvent {
   status: DockerInstallStatus!
   output: [String!]
   timestamp: String!
+}
+
+"One resource sample for a single running container."
+type DockerContainerStatsSample {
+  "Bare 64-char Docker container id, with no server-identifier prefix. A client holding an upstream PrefixedID must strip the <serverId>: prefix before matching against this."
+  id: ID!
+
+  "CPU use on the same basis as docker stats: summed across online CPUs, so a container saturating 4 threads reports ~400. Clients divide by the host thread count to get a whole-machine percentage."
+  cpuPercent: Float!
+
+  "Resident memory in bytes, cache excluded. Matches the left side of docker stats MEM USAGE."
+  memUsedBytes: BigInt!
+
+  "Memory limit in bytes for this container, or the host total when the container is unlimited."
+  memTotalBytes: BigInt!
+
+  "Cumulative bytes received since container start, summed across every attached interface. null when Docker reports no per-container network counters, which is the case for NetworkMode=host containers because they share the host's network namespace. Clients must hide their network column on null rather than rendering zero."
+  netRxBytes: BigInt
+
+  "Cumulative bytes transmitted since container start. null under the same conditions as netRxBytes."
+  netTxBytes: BigInt
+
+  "Cumulative bytes read from block devices since container start. null when Docker reports no blkio counters."
+  blkReadBytes: BigInt
+
+  "Cumulative bytes written to block devices since container start. null under the same conditions as blkReadBytes."
+  blkWriteBytes: BigInt
+
+  "When the Docker engine read these counters, epoch milliseconds, taken from the stats chunk's own read field rather than from any clock downstream of it. Falls back to the service clock only when read is absent or unparseable. Clients delta consecutive samples against this rather than the device clock, so neither event-loop jitter on the service nor a slow or rescheduled client can distort the computed rate."
+  sampledAtMs: BigInt!
 }
 
 "Tracked plugin uninstall operation snapshot. Reuses the DockerInstallOperation shape/semantics (design: 'the resolver reuses the shape')."

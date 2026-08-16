@@ -87,6 +87,7 @@ import {
 import { createEmhttpdClient } from './features/shares/platform.js';
 import { getDiskThresholds, updateDiskThresholds } from './features/disk_thresholds/resolvers.js';
 import { createDynamixConfigClient } from './features/disk_thresholds/platform.js';
+import { subscribeDockerContainerStats } from './features/docker_stats/stats.js';
 import { existsSync, promises as fsPromises } from 'node:fs';
 import path from 'node:path';
 
@@ -290,7 +291,16 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
     diskThresholds: () => getDiskThresholds({ client: dynamixConfigClient }),
     updateDiskThresholds: (input) =>
       updateDiskThresholds(input, { client: dynamixConfigClient, audit, caller }),
+    subscribeDockerContainerStats: () =>
+      subscribeDockerContainerStats({ dockerClient, log: logDockerStats }),
   };
+}
+
+/** Every docker_stats failure path must be diagnosable (finding #2: never
+ * swallow) -- same one-line writer shape as the access-log line above. */
+function logDockerStats(message: string, error?: unknown): void {
+  const detail = error ? `: ${error instanceof Error ? error.message : String(error)}` : '';
+  process.stderr.write(`[docker-stats] ${message}${detail}\n`);
 }
 
 /**

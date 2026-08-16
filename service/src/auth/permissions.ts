@@ -72,6 +72,11 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   // Never checked -- a detection flag, not an operation. Present only
   // because this map is total over CapabilityKey.
   'docker.templateFixedIp': { resource: 'DOCKER', action: 'update' },
+  // Never actually checked -- dockerContainerStats is a read-only
+  // subscription, ungated in resolvers.ts (same posture as
+  // plugins.installedDetailed above). Present only because this map is
+  // total over CapabilityKey.
+  'docker.stats': { resource: 'DOCKER', action: 'update' },
 };
 
 function permissionKey(permission: RequiredPermission): string {
