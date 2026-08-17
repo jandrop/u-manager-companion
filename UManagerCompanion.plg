@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.08.14.1">
+<!ENTITY version "2026.08.17.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,13 @@
 
 <CHANGES>
 <![CDATA[
+###2026.08.17.1
+- Live container stats (CPU, memory, network, disk) now come from the
+  companion service instead of the patched Unraid API. Network rates update
+  properly and memory usage is no longer overstated.
+- Removed the old container stats patch from the Unraid API. One less file
+  the companion touches, so an API update is less likely to break it.
+
 ###2026.08.14.1
 - Fixed the container template screen failing to load for most containers.
   It now returns the same data the rest of the app already got.
