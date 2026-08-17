@@ -52,6 +52,113 @@ export interface DockerContainerListEntry {
   readonly Names: readonly string[];
 }
 
+/** Untrusted wire data off the stats socket: every field optional, nothing
+ * assumed present -- a host-network container has no `networks`, a cgroup-v1
+ * host has no `inactive_file`, etc. */
+export interface DockerStatsChunk {
+  readonly read?: string;
+  readonly cpu_stats?: {
+    readonly cpu_usage?: { readonly total_usage?: number };
+    readonly system_cpu_usage?: number;
+    readonly online_cpus?: number;
+  };
+  readonly precpu_stats?: {
+    readonly cpu_usage?: { readonly total_usage?: number };
+    readonly system_cpu_usage?: number;
+  };
+  readonly memory_stats?: {
+    readonly usage?: number;
+    readonly limit?: number;
+    readonly stats?: {
+      readonly inactive_file?: number;
+      readonly total_inactive_file?: number;
+      readonly cache?: number;
+    };
+  };
+  readonly networks?: Record<string, { readonly rx_bytes?: number; readonly tx_bytes?: number }>;
+  readonly blkio_stats?: {
+    readonly io_service_bytes_recursive?: readonly { readonly op?: string; readonly value?: number }[];
+  };
+}
+
+/** One decoded Docker daemon event -- only the fields the lifecycle
+ * orchestrator's start/die/stop/kill/destroy handling needs. */
+export interface DockerEventChunk {
+  readonly status?: string;
+  readonly id?: string;
+  readonly Actor?: { readonly ID?: string };
+}
+
+/** Four callbacks because each maps to a DIFFERENT recovery: onChunk is
+ * data; onDecodeError drops one frame and the stream lives; onError means
+ * the stream is dead and must be reopened; onEnd is a clean close (e.g. the
+ * container stopped). */
+export interface DockerStreamHandlers<TChunk> {
+  onChunk(chunk: TChunk): void;
+  onDecodeError(error: unknown, rawLine: string): void;
+  onError(error: unknown): void;
+  onEnd(): void;
+}
+
+/** `destroy()` is idempotent and safe to call after onEnd/onError. */
+export interface DockerStreamHandle {
+  destroy(): void;
+}
+
+/**
+ * Docker frames newline-delimited JSON over a socket that may split ONE
+ * object across chunks or coalesce SEVERAL into one. A naive per-chunk
+ * `JSON.parse` therefore drops or corrupts samples. Holds the trailing
+ * partial line until its newline arrives.
+ *
+ * Exported as a pure function so the framing logic is testable without a
+ * socket.
+ */
+export function createNdjsonSplitter<T>(
+  onObject: (value: T) => void,
+  onDecodeError: (error: unknown, rawLine: string) => void,
+): (chunk: Buffer | string) => void {
+  let buffered = '';
+  return (chunk) => {
+    buffered += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+    let newlineIndex = buffered.indexOf('\n');
+    while (newlineIndex !== -1) {
+      const line = buffered.slice(0, newlineIndex).trim();
+      buffered = buffered.slice(newlineIndex + 1);
+      if (line) {
+        try {
+          onObject(JSON.parse(line) as T);
+        } catch (error) {
+          onDecodeError(error, line);
+        }
+      }
+      newlineIndex = buffered.indexOf('\n');
+    }
+  };
+}
+
+/** Wires a raw dockerode ReadableStream to the NDJSON splitter + handlers,
+ * returning an idempotent destroy() handle. Shared by both stream methods
+ * below -- chunk framing is a transport property, not a stats/events one. */
+function attachHandlers<T>(
+  stream: NodeJS.ReadableStream,
+  handlers: DockerStreamHandlers<T>,
+): DockerStreamHandle {
+  const split = createNdjsonSplitter<T>(handlers.onChunk, handlers.onDecodeError);
+  stream.on('data', (chunk: Buffer) => split(chunk));
+  stream.on('error', (error: unknown) => handlers.onError(error));
+  stream.on('end', () => handlers.onEnd());
+
+  let destroyed = false;
+  return {
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      (stream as NodeJS.ReadableStream & { destroy?: () => void }).destroy?.();
+    },
+  };
+}
+
 /** Docker API errors carry a `statusCode` (e.g. 304 already-started, 404
  * not-found) that callers branch on -- narrow, structural check rather
  * than importing dockerode's error classes. */
@@ -72,6 +179,16 @@ export interface DockerClient {
   pull(repoTag: string, onProgress: (event: DockerPullProgressEvent) => void): Promise<void>;
   pruneVolumes(): Promise<void>;
   listContainers(options?: { readonly all?: boolean }): Promise<readonly DockerContainerListEntry[]>;
+  /** Opens a live `docker stats --stream` socket for one container. Resolves
+   * once the stream is open; chunks/errors/end arrive via `handlers`. */
+  streamContainerStats(
+    id: string,
+    handlers: DockerStreamHandlers<DockerStatsChunk>,
+  ): Promise<DockerStreamHandle>;
+  /** Opens the daemon-wide container lifecycle events stream, filtered to
+   * start/die/stop/kill/destroy -- the events the stats lifecycle cares
+   * about. */
+  streamContainerEvents(handlers: DockerStreamHandlers<DockerEventChunk>): Promise<DockerStreamHandle>;
 }
 
 let cachedDockerode: Docker | undefined;
@@ -142,6 +259,16 @@ export function createDockerClient(docker: Docker = resolveDockerode()): DockerC
         Image: container.Image,
         Names: container.Names,
       }));
+    },
+    async streamContainerStats(id, handlers) {
+      const stream = await docker.getContainer(id).stats({ stream: true });
+      return attachHandlers(stream, handlers);
+    },
+    async streamContainerEvents(handlers) {
+      const stream = await docker.getEvents({
+        filters: { type: ['container'], event: ['start', 'die', 'stop', 'kill', 'destroy'] },
+      });
+      return attachHandlers(stream, handlers);
     },
   };
 }

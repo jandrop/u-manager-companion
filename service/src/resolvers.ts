@@ -47,6 +47,7 @@ import type {
   ShareSettingsInput,
 } from './features/shares/platform.js';
 import type { DiskThresholdsInput, DiskThresholdsRecord } from './features/disk_thresholds/platform.js';
+import type { DockerContainerStatsSample } from './features/docker_stats/map.js';
 
 // ---------------------------------------------------------------------------
 // Context + injected feature-module surface
@@ -120,6 +121,9 @@ export interface FeatureModuleDeps {
     input: DiskThresholdsInput,
     caller: AuditCaller,
   ) => Promise<DiskThresholdsRecord>;
+  /** Rejects with a GraphQLError at subscribe time if the Docker engine is
+   * unreachable -- see docker_stats/stats.ts's subscribeDockerContainerStats. */
+  readonly subscribeDockerContainerStats: () => Promise<AsyncIterable<readonly DockerContainerStatsSample[]>>;
 }
 
 export interface GraphqlContext {
@@ -558,6 +562,23 @@ export const resolvers = {
           throw new GraphQLError(`Unknown Docker install operation: ${args.operationId}`);
         }
         return pubsub.asyncIterator(channelFor(DOCKER_INSTALL_CHANNEL_PREFIX, args.operationId));
+      },
+    },
+    // Read-only -- NOT permission-gated, same posture as the other read
+    // resolvers (installedUnraidPluginsDetailed, diskThresholds).
+    dockerContainerStats: {
+      subscribe(
+        _parent: unknown,
+        _args: Record<string, never>,
+        context: GraphqlContext,
+      ): Promise<AsyncIterable<readonly DockerContainerStatsSample[]>> {
+        return context.deps.subscribeDockerContainerStats();
+      },
+      // Whether graphql-tools passes a subscription payload through by
+      // default is unverified in this repo (D7) -- declared explicitly so
+      // no doubt is left to a library default.
+      resolve(payload: readonly DockerContainerStatsSample[]): readonly DockerContainerStatsSample[] {
+        return payload;
       },
     },
   },
