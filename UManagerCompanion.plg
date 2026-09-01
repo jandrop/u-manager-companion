@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.08.17.1">
+<!ENTITY version "2026.09.01.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,9 @@
 
 <CHANGES>
 <![CDATA[
+###2026.09.01.1
+- Performance improvements.
+
 ###2026.08.17.1
 - Live container stats (CPU, memory, network, disk) now come from the
   companion service instead of the patched Unraid API. Network rates update
