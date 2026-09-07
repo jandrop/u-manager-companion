@@ -2,6 +2,7 @@
  * allDiskSmartSettings queries and the update/reset mutations. Mutations run
  * validate -> read -> audit -> patch -> write, returning the parse of the text
  * just written. Concurrent webGUI saves are last-writer-wins. */
+import { ValidationError } from '../../context.js';
 import type { AuditCaller, AuditLogger } from '../../audit.js';
 import { hasAnySection } from './ini.js';
 import type {
@@ -29,13 +30,13 @@ const MAX_TEMPERATURE_CELSIUS = 300;
 
 function requireInteger(key: string, value: number): void {
   if (!Number.isInteger(value)) {
-    throw new Error(`${key} must be an integer.`);
+    throw new ValidationError(`${key} must be an integer.`);
   }
 }
 
 function requireNonNegative(key: string, value: number): void {
   if (!Number.isFinite(value) || value < 0) {
-    throw new Error(`${key} must not be negative.`);
+    throw new ValidationError(`${key} must not be negative.`);
   }
 }
 
@@ -46,7 +47,7 @@ function validateDiskSmartInput(input: DiskSmartSettingsInput): void {
     requireInteger(key, value);
     requireNonNegative(key, value);
     if (value > MAX_TEMPERATURE_CELSIUS) {
-      throw new Error(`${key} must be between 0 and ${MAX_TEMPERATURE_CELSIUS}.`);
+      throw new ValidationError(`${key} must be between 0 and ${MAX_TEMPERATURE_CELSIUS}.`);
     }
   }
 
@@ -61,7 +62,7 @@ function validateDiskSmartInput(input: DiskSmartSettingsInput): void {
   const codes = input.notifyAttributes;
   if (codes === null) return;
   if (codes.length === 0) {
-    throw new Error('notifyAttributes must not be empty; use null to inherit the default set.');
+    throw new ValidationError('notifyAttributes must not be empty; use null to inherit the default set.');
   }
   for (const code of codes) {
     requireInteger('notifyAttributes', code);
@@ -84,13 +85,13 @@ export function resolveDiskSectionId(raw: string): string {
   const section = raw.replace(SERVER_ID_PREFIX_RE, '');
 
   if (section.length === 0 || section.length > MAX_SECTION_NAME_LENGTH) {
-    throw new Error(`Disk id must be 1 to ${MAX_SECTION_NAME_LENGTH} characters.`);
+    throw new ValidationError(`Disk id must be 1 to ${MAX_SECTION_NAME_LENGTH} characters.`);
   }
   if (section !== section.trim()) {
-    throw new Error('Disk id must not have leading or trailing whitespace.');
+    throw new ValidationError('Disk id must not have leading or trailing whitespace.');
   }
   if (UNSAFE_SECTION_CHARS_RE.test(section)) {
-    throw new Error('Disk id contains characters that cannot appear in a config section name.');
+    throw new ValidationError('Disk id contains characters that cannot appear in a config section name.');
   }
 
   return section;

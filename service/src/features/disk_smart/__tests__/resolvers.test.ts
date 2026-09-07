@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ValidationError } from '../../../context.js';
 import type { AuditLogger } from '../../../audit.js';
 import type { DiskSmartSettingsInput } from '../platform.js';
 import {
@@ -158,7 +159,7 @@ describe('getDiskSmartSettings', () => {
   it('rejects a hostile id with ZERO client calls -- the guard runs before any IO', async () => {
     const client = makeClient();
 
-    await expect(getDiskSmartSettings('disk]\n[other', { client })).rejects.toThrow();
+    await expect(getDiskSmartSettings('disk]\n[other', { client })).rejects.toBeInstanceOf(ValidationError);
 
     expect(client.readText).not.toHaveBeenCalled();
     expect(client.writeText).not.toHaveBeenCalled();
@@ -200,7 +201,7 @@ describe('updateDiskSmartSettings -- validation runs before any IO', () => {
 
     await expect(
       updateDiskSmartSettings(HDD_ID, input, { client, audit, caller: makeCaller() }),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(ValidationError);
 
     expect(client.readText).not.toHaveBeenCalled();
     expect(client.writeText).not.toHaveBeenCalled();
@@ -218,7 +219,7 @@ describe('updateDiskSmartSettings -- validation runs before any IO', () => {
         { ...VALID_INPUT, notifyAttributes: [] },
         { client, audit, caller: makeCaller() },
       ),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(ValidationError);
 
     expect(client.readText).not.toHaveBeenCalled();
     expect(audit.recordAuditEvent).not.toHaveBeenCalled();
@@ -236,7 +237,7 @@ describe('updateDiskSmartSettings -- validation runs before any IO', () => {
         { ...VALID_INPUT, notifyAttributes },
         { client, audit: makeAudit(), caller: makeCaller() },
       ),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(ValidationError);
 
     expect(client.readText).not.toHaveBeenCalled();
   });
@@ -275,7 +276,7 @@ describe('updateDiskSmartSettings -- validation runs before any IO', () => {
         audit,
         caller: makeCaller(),
       }),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(ValidationError);
 
     expect(audit.recordAuditEvent).not.toHaveBeenCalled();
     expect(client.readText).not.toHaveBeenCalled();
@@ -287,7 +288,7 @@ describe('updateDiskSmartSettings -- validation runs before any IO', () => {
 
     await expect(
       resetDiskSmartSettings('x=1', { client, audit, caller: makeCaller() }),
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(ValidationError);
 
     expect(audit.recordAuditEvent).not.toHaveBeenCalled();
     expect(client.readText).not.toHaveBeenCalled();

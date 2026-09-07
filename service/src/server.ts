@@ -53,6 +53,7 @@ import {
   toWsConnectionInitCloseReason,
   AuthenticationError,
   PermissionError,
+  ValidationError,
   WS_CONNECTION_INIT_UNAUTHORIZED_CODE,
   type ResolveAuthContextOptions,
 } from './context.js';
@@ -391,6 +392,9 @@ export async function startServer(options: StartServerOptions = {}): Promise<Com
       }
       if (original instanceof AuthenticationError) {
         return { message: original.message, extensions: { code: 'UNAUTHENTICATED' } };
+      }
+      if (original instanceof ValidationError) {
+        return { message: original.message, extensions: { code: 'BAD_USER_INPUT' } };
       }
       return formattedError;
     },
