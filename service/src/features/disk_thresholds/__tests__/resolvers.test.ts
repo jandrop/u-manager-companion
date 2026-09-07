@@ -1,14 +1,3 @@
-/**
- * features/disk_thresholds resolvers tests.
- *
- * TDD: written before resolvers.ts exists -> RED first.
- *
- * Covers the read (getDiskThresholds -- ungated, not audited) and write
- * (updateDiskThresholds -- validated, audited BEFORE the file write) side
- * of the feature module. Talks to dynamix.cfg through an injectable
- * DynamixConfigClient (platform.ts), so nothing here ever touches a real
- * filesystem.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';
 import type { DiskThresholdsInput, DynamixConfigClient } from '../platform.js';

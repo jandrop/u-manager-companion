@@ -1,10 +1,3 @@
-/**
- * Validated-reload tests -- atomic write-then-rename(2) swap,
- * backup/restore-on-FAIL, `nginx -t` against the real tree, `nginx -s
- * reload` on PASS.
- *
- * TDD: written before validated-reload.ts exists -> RED first.
- */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

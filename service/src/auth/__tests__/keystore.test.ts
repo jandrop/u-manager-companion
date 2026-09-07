@@ -1,20 +1,3 @@
-/**
- * Key-store parser, verified shape per box-verification.
- *
- * TDD: written before keystore.ts exists -> RED first.
- *
- * Fixture shape mirrors the VERIFIED on-box format exactly:
- *   - dir: /boot/config/plugins/dynamix.my.servers/keys/*.json (path is
- *     injectable via COMPANION_KEYSTORE_DIR for tests, same pattern as
- *     server.ts's resolvePort()).
- *   - filename = <uuid>.json, NOT the key value.
- *   - file shape: {createdAt, id, key, name, permissions, roles: [str]}.
- *   - observed roles: ADMIN, VIEWER. Empty permissions -> role carries
- *     authority (ADMIN=full, VIEWER=read-only). Explicit grants are
- *     objects ({resource, actions}), honored INSTEAD of the role, and
- *     normalized to the `RESOURCE:action` strings permissions.ts
- *     compares against.
- */
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -174,12 +157,6 @@ describe('resolveIdentityFromKey', () => {
   });
 });
 
-/**
- * The shape unraid-api writes for a key created with
- * `unraid-api apikey --create -r VIEWER -p DISPLAY:UPDATE_ANY`:
- *
- *   "permissions": [{ "resource": "DISPLAY", "actions": ["UPDATE_ANY"] }]
- */
 describe('object-shaped permissions', () => {
   function writeGranted(key: string, permissions: unknown, roles = ['VIEWER']): void {
     writeKeyFile(`${key}.json`, {
@@ -319,15 +296,6 @@ describe('object-shaped permissions', () => {
   });
 });
 
-/**
- * This file and permissions.test.ts meet at a bare `RESOURCE:action`
- * string, and each suite only pins its own side of it: the normalizer
- * here produces `CONFIG:update`, the map there requires `CONFIG:update`.
- * Change either spelling alone and both suites stay green while every
- * scoped key silently loses access -- exactly the failure this fix
- * exists to repair. So walk the whole path once, on the real seam: a key
- * file on disk -> resolved identity -> authorization decision.
- */
 describe('key file -> authorization decision', () => {
   it('authorizes the plugin operations for a key granted CONFIG on disk', () => {
     writeKeyFile('66666666-6666-6666-6666-666666666666.json', {

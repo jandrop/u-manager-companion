@@ -1,8 +1,3 @@
-/**
- * nginx include-file content builder tests.
- *
- * TDD: written before include.ts exists -> RED first.
- */
 import { describe, expect, it } from 'vitest';
 import { buildIncludeFileContent } from '../include.js';
 

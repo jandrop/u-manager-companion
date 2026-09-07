@@ -1,16 +1,3 @@
-/**
- * Build-pipeline smoke tests.
- *
- * Runs the real esbuild step (build/bundle.mjs) against the real source and
- * asserts on its output -- not a mock. This is the "bundle builds" leg of
- * a three-part smoke test (bundle / entry-starts / size-check).
- *
- * The SEA injection step itself (scripts/build-sea.sh) targets linux-x64
- * and cannot be executed on this darwin dev machine -- that leg is
- * exercised for real on the live box. This suite covers what IS verifiable
- * locally: the CJS bundle esbuild produces is valid, requireable, and
- * starts without throwing.
- */
 import { execFileSync } from 'node:child_process';
 import { existsSync, statSync, rmSync } from 'node:fs';
 import path from 'node:path';

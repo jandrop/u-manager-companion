@@ -1,17 +1,3 @@
-/**
- * docker_update/check-updates.ts tests.
- *
- * TDD: written before check-updates.ts exists -> RED first.
- *
- * Covers `checkForDockerUpdates`: shells to
- * `dynamix.docker.manager/scripts/dockerupdate` (no args) and returns
- * true iff its exit code is 0. Mirrors the "Check for Updates" button on
- * the Unraid Docker page. `docker.checkForUpdates` is a privileged
- * (audited) action per auth/permissions.ts's OPERATION_PERMISSIONS map --
- * unlike the plugins-namespace checkForUpdates (which is a non-audited
- * read), this one triggers a cache refresh and is gated/audited like the
- * other docker mutations.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';
 import type { StreamedProcessRunner } from '../../../platform/process-runner.js';

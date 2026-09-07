@@ -1,10 +1,3 @@
-/**
- * Startup crash-recovery tests -- if a `.bak` marker is
- * present alongside the real include path, restore it FIRST (before the
- * normal ensure-include flow runs), then remove the leftover marker.
- *
- * TDD: written before crash-recovery.ts exists -> RED first.
- */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -1,17 +1,3 @@
-/**
- * docker_template/edit.ts tests.
- *
- * TDD: written before edit.ts exists -> RED first.
- *
- * Covers the edit pipeline: stop existing container, remove it, overwrite
- * my-<Name>.xml, pull the image ONLY if missing (never a stealth update --
- * the dedicated "Update Container" mutation is the unconditional-pull
- * path), rebuild via rebuild_container, audited. input.name must match the
- * EXISTING container (no rename support). There is no cosmetic log-line
- * rendering of the equivalent `docker run` command here -- it has no
- * functional effect on the edit outcome and would mean shelling out to
- * `php -r`, which this service avoids entirely.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';
 import type { DockerClient } from '../../../platform/docker-client.js';

@@ -1,28 +1,3 @@
-/**
- * schema/catalogue parity gate.
- *
- * Loads the v1 companion GraphQL operation documents straight out of the
- * app repo's op catalogue (packages/unraid_api/lib/src/graphql/companion)
- * and validates each one against this service's own schema.graphql using
- * graphql-js's `validate()`. This is a READ-ONLY cross-repo reference --
- * no app repo files are modified by this test, and no assumption is made
- * about the app repo's own toolchain (we only regex-extract raw GraphQL
- * document strings out of .dart source).
- *
- * Scope: only the op documents the SDL actually covers (docker template
- * install/edit/delete, docker update streams + checkForUpdates,
- * serverPower shutdown/reboot/sleep, unraidPlugins uninstall/checkForUpdates,
- * dockerInstallOperation query, dockerInstallUpdates subscription, --
- * Slice 1 (companion-category-a-migration) -- shares list/security/
- * security-users/is-empty queries and createShare/updateShare/deleteShare/
- * updateShareSecurity/updateShareAccess mutations, and -- Slice 2 -- the
- * installedUnraidPluginsDetailed query). The companion catalogue also
- * carries network/array/metrics ops that remain OUT of schema scope until
- * their own migration slices land -- parity for those is not this gate's
- * job yet.
- *
- * TDD: written before the extraction helper exists -> RED first.
- */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildSchema, parse, validate } from 'graphql';
@@ -54,12 +29,6 @@ const COMPANION_CATALOGUE_ROOT = path.join(
   'companion',
 );
 
-/** The specific v1 op-catalogue files the SDL (schema.graphql) covers.
- * Slice 1 (companion-category-a-migration) adds the shares queries +
- * mutations -- both now validate against the SDL's root
- * shares/shareSecurity/shareSecurityUsers/shareIsEmpty queries and
- * createShare/updateShare/deleteShare/updateShareSecurity/
- * updateShareAccess mutations. */
 const V1_CATALOGUE_FILES = [
   'mutations/unraid_graphql_docker_template_mutations.dart',
   'mutations/unraid_graphql_docker_mutations.dart',
@@ -81,14 +50,6 @@ interface ExtractedOperation {
   document: string;
 }
 
-/**
- * Extracts every `static const String ... = r'''...''';` (or the
- * non-raw `'''...'''` variant) GraphQL document from a .dart source file.
- * Matches both the raw-string (`r'''`) and plain triple-quoted forms the
- * companion catalogue uses interchangeably (raw strings are used only
- * when the document needs literal `$` for GraphQL variables that would
- * otherwise be read as Dart string interpolation).
- */
 function extractOperations(dartSource: string, sourceFile: string): ExtractedOperation[] {
   const pattern = /static const String \w+\s*=\s*r?'''([\s\S]*?)''';/g;
   const operations: ExtractedOperation[] = [];

@@ -1,15 +1,3 @@
-/**
- * docker_template/xml.ts tests.
- *
- * TDD: written before xml.ts exists -> RED first.
- *
- * GOLDEN-STRING TESTS: asserts the exact rendered XML output of
- * buildTemplateXml/configToXml/sanitiseName (and the matching read-side
- * parseTemplateXml/readTag/unescXml). The app's DTOs and the demo server
- * depend on this exact shape -- any structural drift (attribute order,
- * escaping, empty-tag self-closing, config self-closing-vs-body-value) is
- * a breaking change, not a style choice.
- */
 import { describe, expect, it } from 'vitest';
 import {
   buildTemplateXml,

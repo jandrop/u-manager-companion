@@ -1,15 +1,3 @@
-/**
- * `{ me }` fallback probe against the LOCAL unraid-api /graphql.
- *
- * This is the SECONDARY auth path: reached only when key-store
- * resolution (keystore.ts) fails or is unrecognised. A successful `{ me
- * }` response (any resolvable identity) is accepted; couples this path
- * to unraid-api being up -- if the key store is unreadable AND
- * unraid-api is down, the request is fail-closed rejected.
- *
- * TDD: written before identity.ts exists -> RED first. `fetch` is
- * mocked via vi.stubGlobal so no real network call happens.
- */
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

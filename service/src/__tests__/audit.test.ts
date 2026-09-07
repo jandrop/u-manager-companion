@@ -1,13 +1,3 @@
-/**
- * audit.ts tests.
- *
- * TDD: written before audit.ts exists -> RED first.
- *
- * Pins: JSON-lines record shape {action, caller, timestamp, target, outcome},
- * rotating file writes under an injectable run-dir (never the real
- * filesystem in tests), and an optional syslog mirror that is injectable so
- * tests never actually shell out to `logger`.
- */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

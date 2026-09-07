@@ -1,10 +1,3 @@
-/**
- * Uninstall cleanup path tests -- remove the include file,
- * strip the appended include line from locations.conf, and validated
- * reload.
- *
- * TDD: written before uninstall.ts exists -> RED first.
- */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

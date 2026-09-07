@@ -1,9 +1,3 @@
-/**
- * capabilities resolver returns
- * { schemaVersion, serviceVersion, features }.
- *
- * TDD: written before health.ts exists -> RED first.
- */
 import { describe, expect, it } from 'vitest';
 import { getCapabilities } from '../health.js';
 import { SCHEMA_VERSION, CAPABILITY_KEYS } from '../schema/version.js';

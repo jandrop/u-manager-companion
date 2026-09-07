@@ -1,11 +1,3 @@
-/**
- * Size-budget gate tests.
- *
- * Exercises scripts/check-size-budget.mjs as a real child process against
- * synthetic files, rather than reimplementing its threshold logic here --
- * the whole point of this gate is that it fails LOUDLY on a real artifact,
- * so the test should drive the actual script, not a copy of its logic.
- */
 import { execFileSync } from 'node:child_process';
 import { closeSync, mkdtempSync, openSync, rmSync, ftruncateSync } from 'node:fs';
 import { tmpdir } from 'node:os';
