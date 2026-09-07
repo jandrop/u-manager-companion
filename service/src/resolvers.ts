@@ -51,6 +51,7 @@ import type {
   DiskSmartSettingsInput,
   DiskSmartSettingsRecord,
 } from './features/disk_smart/platform.js';
+import type { DiskUtilizationThresholdsInput } from './features/disk_utilization/resolvers.js';
 import type { DockerContainerStatsSample } from './features/docker_stats/map.js';
 
 // ---------------------------------------------------------------------------
@@ -139,6 +140,10 @@ export interface FeatureModuleDeps {
     input: DiskThresholdsInput,
     caller: AuditCaller,
   ) => Promise<DiskThresholdsRecord>;
+  readonly updateDiskUtilizationThresholds: (
+    input: DiskUtilizationThresholdsInput,
+    caller: AuditCaller,
+  ) => Promise<boolean>;
   /** Rejects with a GraphQLError at subscribe time if the Docker engine is
    * unreachable -- see docker_stats/stats.ts's subscribeDockerContainerStats. */
   readonly subscribeDockerContainerStats: () => Promise<AsyncIterable<readonly DockerContainerStatsSample[]>>;
@@ -498,6 +503,18 @@ export const resolvers = {
     ): Promise<DiskSmartSettingsRecord> {
       const caller = requirePermission(context, 'diskSmartSettings');
       return context.deps.resetDiskSmartSettings(args.diskId, caller);
+    },
+    updateDiskUtilizationThresholds(
+      _parent: unknown,
+      args: DiskUtilizationThresholdsInput,
+      context: GraphqlContext,
+    ): Promise<boolean> {
+      const caller = requirePermission(context, 'diskUtilizationThresholds');
+      // Forwarded as-is: KEY PRESENCE is the contract (an omitted field
+      // keeps its value, an explicit null clears it), and Apollo only
+      // populates the arguments the client actually sent. Rebuilding the
+      // object here would erase that distinction.
+      return context.deps.updateDiskUtilizationThresholds(args, caller);
     },
   },
 

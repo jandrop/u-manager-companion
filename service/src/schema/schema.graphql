@@ -108,6 +108,8 @@ type Mutation {
 
   "Deletes one disk's ENTIRE section, mirroring the webGUI's DEFAULT button -- unmodeled controller keys go with it. The file itself is unlinked only when no section remains, so a sibling disk's settings are never collateral. Returns the resulting unconfigured record."
   resetDiskSmartSettings(diskId: PrefixedID!): DiskSmartSettings!
+  "Sets ONE disk's utilization warning/critical thresholds (percent), keyed by the disk's slot index, via emhttpd's `changeDisk` command. PARTIAL by contract, unlike updateDiskThresholds: an OMITTED argument is not sent and keeps its current value, an explicit null CLEARS it so the disk inherits the global threshold, and a number sets it. 0 is a real value -- every Unraid consumer guards on `limit > 0`, so it disables that band rather than warning always. Read the current values from the native API's `array { disks { idx warning critical } }`; this service does not duplicate them."
+  updateDiskUtilizationThresholds(diskIdx: Int!, warning: Int, critical: Int): Boolean!
 }
 
 type Subscription {

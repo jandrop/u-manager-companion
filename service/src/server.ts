@@ -87,6 +87,7 @@ import {
 } from './features/shares/resolvers.js';
 import { createEmhttpdClient } from './features/shares/platform.js';
 import { getDiskThresholds, updateDiskThresholds } from './features/disk_thresholds/resolvers.js';
+import { updateDiskUtilizationThresholds } from './features/disk_utilization/resolvers.js';
 import { createDynamixConfigClient } from './features/disk_thresholds/platform.js';
 import {
   getAllDiskSmartSettings,
@@ -306,6 +307,10 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
       resetDiskSmartSettings(diskId, { client: smartConfigClient, audit, caller }),
     updateDiskThresholds: (input) =>
       updateDiskThresholds(input, { client: dynamixConfigClient, audit, caller }),
+    // Reuses the emhttpd client shares already builds -- disk_utilization
+    // depends only on its sendCommand.
+    updateDiskUtilizationThresholds: (input) =>
+      updateDiskUtilizationThresholds(input, { client: sharesClient, audit, caller }),
     subscribeDockerContainerStats: () =>
       subscribeDockerContainerStats({ dockerClient, log: logDockerStats }),
   };
