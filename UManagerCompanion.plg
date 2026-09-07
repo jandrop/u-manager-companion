@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.08.17.1">
+<!ENTITY version "2026.09.01.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,9 @@
 
 <CHANGES>
 <![CDATA[
+###2026.09.01.1
+- Performance improvements.
+
 ###2026.08.17.1
 - Live container stats (CPU, memory, network, disk) now come from the
   companion service instead of the patched Unraid API. Network rates update
@@ -372,7 +375,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <!-- Placeholder in the source repo; CI computes and injects the real SHA at
      release time (see .github/workflows/release.yml), same as the service
      bundle below. Keeps the committed .plg SHA-clean. -->
-<SHA256>23339d080587586d5b1926ee929bf6bc4a97831a41082ac9e48ffd02a4788754</SHA256>
+<SHA256>267305ea83c0a1fe696ff3e5c8d344402ad75e113da9fba9e6e82f0d33cb8ff4</SHA256>
 </FILE>
 
 <!-- The standalone GraphQL service bundle (esbuild-produced single-file CJS,
