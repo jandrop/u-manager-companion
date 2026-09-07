@@ -1,14 +1,3 @@
-/**
- * docker_template/read-template.ts tests.
- *
- * TDD: written before read-template.ts exists -> RED first.
- *
- * Covers `readDockerTemplate()`: reads templates-user/my-<name>.xml and
- * parses it via xml.ts's parseTemplateXml, returning null when no
- * template exists on disk (ENOENT). Backs the `dockerTemplate(name)`
- * query -- a READ, not audited, since only privileged actions are
- * audited.
- */
 import { describe, expect, it, vi } from 'vitest';
 import { readDockerTemplate, type ReadTemplateFile } from '../read-template.js';
 

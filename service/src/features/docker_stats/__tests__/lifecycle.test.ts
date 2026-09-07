@@ -1,11 +1,3 @@
-/**
- * stats.ts tests -- the lifecycle orchestrator: subscriber counting,
- * per-container + events streams, cadence/staleness, and the two failure
- * paths.
- *
- * TDD: written before stats.ts exists -> RED first. vi.useFakeTimers()
- * drives every timing assertion.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   DockerClient,
@@ -32,10 +24,6 @@ interface FakeHandle {
   readonly destroy: ReturnType<typeof vi.fn>;
 }
 
-/** Records every handler set registered per container id / for the events
- * stream, so a test can drive onChunk/onError/onEnd directly -- exactly the
- * synchronous, loggable, per-container failure shape D1 chose over a raw
- * stream or AsyncIterable. */
 function createFakeDockerClient(initialContainers: readonly DockerContainerListEntry[] = []) {
   const statsHandlers = new Map<string, DockerStreamHandlers<DockerStatsChunk>>();
   const statsHandles = new Map<string, FakeHandle>();

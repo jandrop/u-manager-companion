@@ -71,6 +71,11 @@ const DEFAULT_DYNAMIX_CFG_PATH = '/boot/config/plugins/dynamix/dynamix.cfg';
 const DEFAULT_DYNAMIX_DEFAULTS_PATH =
   '/usr/local/emhttp/plugins/dynamix/default.cfg';
 
+/** Per-disk SMART/temperature overrides, keyed by disk id section. Written
+ * by the webGUI's Device Info form; a pure override file, so removing it
+ * returns every disk to stock. features/disk_smart is the only consumer. */
+const DEFAULT_SMART_ONE_CFG_PATH = '/boot/config/smart-one.cfg';
+
 export interface CompanionConfig {
   /** Loopback-only port the Apollo/graphql-ws server binds. */
   readonly servicePort: number;
@@ -112,6 +117,9 @@ export interface CompanionConfig {
   readonly dynamixConfigPath: string;
   /** Unraid's shipped default.cfg -- source of the placeholder values. */
   readonly dynamixDefaultsPath: string;
+  /** Per-disk SMART settings file path
+   * (features/disk_smart/platform.ts's createSmartConfigClient()). */
+  readonly smartOneConfigPath: string;
 }
 
 /** Parses a boolean-ish env value ('1'/'true' => true, anything else => the
@@ -161,5 +169,6 @@ export function resolveCompanionConfig(env: NodeJS.ProcessEnv = process.env): Co
     dynamixDefaultsPath:
       env['COMPANION_DYNAMIX_DEFAULTS_PATH'] ?? DEFAULT_DYNAMIX_DEFAULTS_PATH,
     dynamixConfigPath: env['COMPANION_DYNAMIX_CONFIG_PATH'] ?? DEFAULT_DYNAMIX_CFG_PATH,
+    smartOneConfigPath: env['COMPANION_SMART_ONE_CONFIG_PATH'] ?? DEFAULT_SMART_ONE_CFG_PATH,
   };
 }

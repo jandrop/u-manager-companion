@@ -1,11 +1,3 @@
-/**
- * pubsub.ts tests.
- *
- * Verifies the per-operation channel-naming helper and that the underlying
- * PubSub instance actually delivers published payloads to subscribers on
- * the matching channel only -- the property the operation engine (registry.ts)
- * depends on for delta-event delivery.
- */
 import { describe, expect, it } from 'vitest';
 import { channelFor, pubsub } from './pubsub';
 

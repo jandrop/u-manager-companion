@@ -1,16 +1,3 @@
-/**
- * fs-watch BEST-EFFORT cache invalidation on key-store files.
- *
- * The 60s TTL (context.ts) is the PRIMARY guarantee; this module is an
- * accelerator only, mirroring watcher.sh's combined-event + debounce
- * pattern (rename/change events are not fully reliable on the FAT
- * /boot mount) PLUS a poll fallback (re-stat on an interval <= TTL) so
- * the cache is never stale for longer than one TTL window even with
- * zero working fs-watch events (the "simulated-silent fs-watch ->
- * poll-fallback path").
- *
- * TDD: written before watch.ts exists -> RED first.
- */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';

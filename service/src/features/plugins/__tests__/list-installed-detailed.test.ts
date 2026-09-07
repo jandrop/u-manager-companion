@@ -1,14 +1,3 @@
-/**
- * features/plugins/list-installed-detailed.ts tests.
- *
- * TDD: written before list-installed-detailed.ts exists -> RED first.
- *
- * Covers `listInstalledPluginsDetailed(deps)`: maps every filename the
- * injected client reports through `readManifest`/`readReadmeDescription`/
- * `readCachedUpdate`, resolving the name fallback and assembling the final
- * PluginManifestRecord. Everything here is injectable (client), so this
- * suite never touches a real filesystem.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { ParsedPluginManifestXml, PluginManifestClient } from '../platform.js';
 import { listInstalledPluginsDetailed } from '../list-installed-detailed.js';

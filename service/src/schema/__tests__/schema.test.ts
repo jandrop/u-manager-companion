@@ -1,9 +1,3 @@
-/**
- * schema loads without errors, capabilities resolver returns the
- * expected shape.
- *
- * TDD: written before schema.ts / schema.graphql exist -> RED first.
- */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { buildSchema, validateSchema } from 'graphql';
@@ -37,6 +31,8 @@ describe('schema.graphql', () => {
         'updateShareSecurity',
         'updateShareAccess',
         'updateDiskThresholds',
+        'updateDiskSmartSettings',
+        'resetDiskSmartSettings',
       ].sort(),
     );
   });
@@ -58,6 +54,8 @@ describe('schema.graphql', () => {
         'shareIsEmpty',
         'installedUnraidPluginsDetailed',
         'diskThresholds',
+        'diskSmartSettings',
+        'allDiskSmartSettings',
       ].sort(),
     );
   });
@@ -80,6 +78,67 @@ describe('schema.graphql', () => {
     for (const key of keys) {
       expect(inputFields[key]!.type.toString()).toBe('Int');
     }
+  });
+
+  it('DiskSmartSettings exposes a raw Float smLevel, nullable values and a non-null default set', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+
+    const outputType = schema.getType('DiskSmartSettings') as import('graphql').GraphQLObjectType;
+    expect(outputType).toBeDefined();
+    const outputFields = outputType.getFields();
+    expect(outputFields['diskId']!.type.toString()).toBe('String!');
+    expect(outputFields['configured']!.type.toString()).toBe('Boolean!');
+    expect(outputFields['hotTemp']!.type.toString()).toBe('Int');
+    expect(outputFields['maxTemp']!.type.toString()).toBe('Int');
+    // Raw passthrough, deliberately NOT an enum.
+    expect(outputFields['smSelect']!.type.toString()).toBe('Int');
+    expect(outputFields['smLevel']!.type.toString()).toBe('Float');
+    expect(outputFields['notifyAttributes']!.type.toString()).toBe('[Int!]');
+    expect(outputFields['defaultNotifyAttributes']!.type.toString()).toBe('[Int!]!');
+    expect(outputFields['preselectAttributes']!.type.toString()).toBe('[Int!]!');
+    // smCustom is written to the file but never exposed.
+    expect(outputFields['smCustom']).toBeUndefined();
+  });
+
+  it('DiskSmartSettingsInput is total over the five modeled keys, every one nullable', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+
+    const inputType = schema.getType('DiskSmartSettingsInput') as import('graphql').GraphQLInputObjectType;
+    expect(inputType).toBeDefined();
+    const inputFields = inputType.getFields();
+    expect(Object.keys(inputFields).sort()).toEqual(
+      ['hotTemp', 'maxTemp', 'smSelect', 'smLevel', 'notifyAttributes'].sort(),
+    );
+    expect(inputFields['hotTemp']!.type.toString()).toBe('Int');
+    expect(inputFields['maxTemp']!.type.toString()).toBe('Int');
+    expect(inputFields['smSelect']!.type.toString()).toBe('Int');
+    expect(inputFields['smLevel']!.type.toString()).toBe('Float');
+    expect(inputFields['notifyAttributes']!.type.toString()).toBe('[Int!]');
+  });
+
+  it('allDiskSmartSettings is a non-null list of non-null records, and takes no args', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+
+    const field = schema.getQueryType()!.getFields()['allDiskSmartSettings']!;
+    expect(field).toBeDefined();
+    // Non-null list: "no disk has an override" is [], never null.
+    expect(field.type.toString()).toBe('[DiskSmartSettings!]!');
+    expect(field.args).toEqual([]);
+  });
+
+  it('preselectAttributes and defaultNotifyAttributes are DIFFERENT fields, not an alias', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+
+    const fields = (
+      schema.getType('DiskSmartSettings') as import('graphql').GraphQLObjectType
+    ).getFields();
+    expect(fields['preselectAttributes']).toBeDefined();
+    expect(fields['defaultNotifyAttributes']).toBeDefined();
+    expect(fields['preselectAttributes']).not.toBe(fields['defaultNotifyAttributes']);
   });
 
   it('declares the v1 Subscription fields (dockerInstallUpdates, dockerContainerStats)', () => {
@@ -143,6 +202,7 @@ describe('CAPABILITY_KEYS', () => {
         'diskThresholds',
         'docker.templateFixedIp',
         'docker.stats',
+        'diskSmartSettings',
       ].sort(),
     );
   });

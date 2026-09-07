@@ -1,15 +1,3 @@
-/**
- * Self-heal monitor tests -- in-process fs monitor on
- * locations.conf, re-appends + validated-reloads when our include line is
- * missing (post-regeneration by rc.nginx). Debounced
- * to avoid reload storms.
- *
- * TDD: written before self-heal-monitor.ts exists -> RED first.
- *
- * The monitor is built on an injectable "watch" primitive rather than
- * node:fs.watch directly, so tests can drive change events deterministically
- * without depending on real filesystem event timing/debouncing quirks.
- */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -1,14 +1,3 @@
-/**
- * docker_template/delete.ts tests.
- *
- * TDD: written before delete.ts exists -> RED first.
- *
- * Covers `deleteTemplate`: stop if running, remove container, optionally
- * remove image (swallowing 409 ImageInUse) + prune volumes, LEAVE the
- * user-template XML in place so it resurfaces as a "Previous App". This
- * mutation is SYNCHRONOUS (schema: `Boolean!`, no streamed operation) --
- * unlike install/edit.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';
 import type { DockerClient } from '../../../platform/docker-client.js';

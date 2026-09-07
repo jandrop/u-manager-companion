@@ -1,18 +1,3 @@
-/**
- * features/shares tests.
- *
- * TDD: written before resolvers.ts exists -> RED first.
- *
- * Covers share mutations, share security, and share-is-empty. Talks to
- * emhttpd's unix socket (`/var/run/emhttpd.socket`) with form-encoded
- * commands and a CSRF token read from `/var/local/emhttp/var.ini`
- * through an injectable `EmhttpdClient`, so nothing here ever touches a
- * real socket/filesystem.
- *
- * Covered: list, security, security-users, is-empty, create, update
- * (partial-settings merge keeps omitted keys), delete (rejects non-empty
- * share dir), update-access ({userId, access} objects).
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { EmhttpdClient, ShareRecord } from '../platform.js';
 import {

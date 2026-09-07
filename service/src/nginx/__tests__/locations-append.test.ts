@@ -1,9 +1,3 @@
-/**
- * Idempotent append-if-missing tests for the include line appended to
- * locations.conf (NOT a wildcard conf.d drop).
- *
- * TDD: written before locations-append.ts exists -> RED first.
- */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

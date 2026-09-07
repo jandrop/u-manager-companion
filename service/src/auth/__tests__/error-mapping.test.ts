@@ -1,19 +1,3 @@
-/**
- * Dual auth-error semantics by transport.
- *
- *   - HTTP path: GraphQL error, extensions.code = UNAUTHENTICATED.
- *   - WS path, connection-level (failed/missing key at connection_init):
- *     close the socket with code 4401 Unauthorized -- no GraphQL body is
- *     possible pre-handshake.
- *   - WS path, per-operation (permission failure on an established
- *     socket): a GraphQL error over the open socket, NOT a close.
- *
- * These helpers are consumed by server.ts at the transport boundary;
- * this module only builds the correctly-shaped error/close objects so
- * that wiring is mechanical.
- *
- * TDD: written before the exports exist in context.ts -> RED first.
- */
 import { GraphQLError } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import {

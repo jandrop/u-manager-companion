@@ -1,20 +1,3 @@
-/**
- * Operation -> required action+resource map, plus the authority check
- * against a resolved identity.
- *
- * Mapping:
- *   - docker template install/edit/delete, docker update streams -> DOCKER (create/update)
- *   - power shutdown/reboot/sleep -> SERVERS (update)
- *   - plugin uninstall/update-check -> CONFIG (update), the resource
- *     unraid-api itself gates installPlugin on; there is no PLUGINS
- *     resource for a key to be granted
- *
- * Key-store path yields real permissions/roles; `{ me }` fallback path
- * ('scoped' authority, no explicit permissions) grants a CONSERVATIVE
- * default -- this must not be treated as automatic full access.
- *
- * TDD: written before permissions.ts exists -> RED first.
- */
 import { describe, expect, it } from 'vitest';
 import {
   OPERATION_PERMISSIONS,

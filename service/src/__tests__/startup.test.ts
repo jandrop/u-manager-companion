@@ -1,11 +1,3 @@
-/**
- * Startup sequence tests: composing crash-recovery -> ensure-include +
- * validated reload -> self-heal monitor start.
- *
- * TDD: written before startup.ts exists -> RED first. All fs/nginx paths are
- * injected/temp-dir based -- nothing here touches the real filesystem or a
- * real `nginx` binary.
- */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -146,11 +138,7 @@ describe('runNginxStartupSequence', () => {
 
     await runNginxStartupSequence(config, { runNginx, watchFile: noopWatchFile() });
 
-    // The .bak marker must be gone (crash-recovery ran), and the include
-    // line was already present in locations.conf, so ensure-include is a
-    // no-op AFTER crash-recovery runs -- but the recovered content gets
-    // overwritten by the normal ensure-include-file-content step anyway
-    // (both write the same generated content deterministically).
+    // The marker's absence is what proves crash-recovery ran.
     expect(existsSync(`${includePath}.bak`)).toBe(false);
   });
 

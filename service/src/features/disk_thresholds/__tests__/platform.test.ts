@@ -1,18 +1,3 @@
-/**
- * features/disk_thresholds/platform.ts tests.
- *
- * TDD: written before platform.ts exists -> RED first.
- *
- * Covers the pure parse/patch algorithm against dynamix.cfg's [display]
- * section. DYNAMIX_CFG_FIXTURE below is pinned byte-for-byte from a live
- * box (root@192.168.1.132, /boot/config/plugins/dynamix/dynamix.cfg,
- * captured 2026-08-03) -- LF-only line endings, font="68.75" sitting
- * between max and hotssd, [parity] following [display] with no
- * blank-line separator, and a stray `warning="5"` inside [notify] that
- * must never leak into the [display]-scoped read. Everything here is
- * pure string-in/string-out (no IO), so this suite never touches a real
- * filesystem.
- */
 import { describe, expect, it } from 'vitest';
 import { parseDiskThresholds, patchDiskThresholds } from '../platform.js';
 

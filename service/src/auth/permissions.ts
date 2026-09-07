@@ -10,6 +10,8 @@
  *     PLUGINS resource, so no key can be granted one.
  *   - updateDiskThresholds -> DISPLAY (update); the diskThresholds READ
  *     query is ungated in resolvers.ts, same posture as the shares reads
+ *   - updateDiskSmartSettings/resetDiskSmartSettings -> DISPLAY (update);
+ *     the diskSmartSettings READ query is ungated, same posture
  *   - shares mutations (create/update/delete/security/access) -> SHARE (update)
  *     (Unraid's own permission model splits share access into separate
  *     CREATE_ANY/UPDATE_ANY/DELETE_ANY grants on Resource.SHARE; this service
@@ -69,6 +71,9 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   'plugins.installedDetailed': { resource: 'CONFIG', action: 'update' },
   shares: { resource: 'SHARE', action: 'update' },
   diskThresholds: { resource: 'DISPLAY', action: 'update' },
+  // Gates updateDiskSmartSettings/resetDiskSmartSettings only; the
+  // diskSmartSettings READ query is ungated in resolvers.ts.
+  diskSmartSettings: { resource: 'DISPLAY', action: 'update' },
   // Never checked -- a detection flag, not an operation. Present only
   // because this map is total over CapabilityKey.
   'docker.templateFixedIp': { resource: 'DOCKER', action: 'update' },
