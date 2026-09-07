@@ -87,6 +87,13 @@ import {
 import { createEmhttpdClient } from './features/shares/platform.js';
 import { getDiskThresholds, updateDiskThresholds } from './features/disk_thresholds/resolvers.js';
 import { createDynamixConfigClient } from './features/disk_thresholds/platform.js';
+import {
+  getAllDiskSmartSettings,
+  getDiskSmartSettings,
+  resetDiskSmartSettings,
+  updateDiskSmartSettings,
+} from './features/disk_smart/resolvers.js';
+import { createSmartConfigClient } from './features/disk_smart/platform.js';
 import { subscribeDockerContainerStats } from './features/docker_stats/stats.js';
 import { existsSync, promises as fsPromises } from 'node:fs';
 import path from 'node:path';
@@ -219,6 +226,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
   const sharesClient = createEmhttpdClient();
   const pluginManifestClient = createPluginManifestClient();
   const dynamixConfigClient = createDynamixConfigClient(config.dynamixConfigPath, config.dynamixDefaultsPath);
+  const smartConfigClient = createSmartConfigClient(config.smartOneConfigPath);
 
   return {
     installDockerTemplate: (input) =>
@@ -289,6 +297,12 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
     listInstalledPluginsDetailed: () =>
       listInstalledPluginsDetailed({ client: pluginManifestClient }),
     diskThresholds: () => getDiskThresholds({ client: dynamixConfigClient }),
+    diskSmartSettings: (diskId) => getDiskSmartSettings(diskId, { client: smartConfigClient }),
+    allDiskSmartSettings: () => getAllDiskSmartSettings({ client: smartConfigClient }),
+    updateDiskSmartSettings: (diskId, input) =>
+      updateDiskSmartSettings(diskId, input, { client: smartConfigClient, audit, caller }),
+    resetDiskSmartSettings: (diskId) =>
+      resetDiskSmartSettings(diskId, { client: smartConfigClient, audit, caller }),
     updateDiskThresholds: (input) =>
       updateDiskThresholds(input, { client: dynamixConfigClient, audit, caller }),
     subscribeDockerContainerStats: () =>

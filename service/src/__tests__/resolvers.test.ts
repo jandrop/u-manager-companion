@@ -1,22 +1,3 @@
-/**
- * resolvers.ts tests.
- *
- * TDD: written before resolvers.ts exists -> RED first.
- *
- * resolvers.ts is a THIN binding layer: SDL field -> permission check
- * (auth/permissions.ts's isAuthorized, throwing PermissionError on
- * failure) -> feature module call -> GraphQL-shape mapping (the
- * `toGraphqlOperation`-equivalent step: operations/registry.ts's
- * OperationSnapshot<TSubject> is GENERIC with a `subject` field, never
- * Docker/plugin-shaped directly -- resolvers.ts is where that snapshot
- * becomes the SDL's DockerInstallOperation/PluginInstallOperation shape).
- * Does NOT wire the Apollo server itself (server.ts) -- this module only
- * exports the resolver map object server.ts mounts.
- *
- * Every feature-module call is injected via GraphqlContext.deps so this
- * suite exercises the BINDING logic (permission gating + shape mapping),
- * not feature-module internals already covered by their own test suites.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { ResolvedIdentity } from '../auth/keystore.js';
 import { PermissionError } from '../context.js';
@@ -70,6 +51,40 @@ function makeContext(overrides: Partial<GraphqlContext['deps']> = {}, identity =
         hotssd: 55,
         maxssd: 65,
       }),
+      diskSmartSettings: vi.fn().mockResolvedValue({
+        diskId: 'diskA',
+        configured: true,
+        hotTemp: 41,
+        maxTemp: 51,
+        smSelect: null,
+        smLevel: null,
+        notifyAttributes: null,
+        defaultNotifyAttributes: [5, 187, 197, 198, 199],
+        preselectAttributes: [5, 187, 188, 197, 198, 199],
+      }),
+      allDiskSmartSettings: vi.fn().mockResolvedValue([]),
+      updateDiskSmartSettings: vi.fn().mockResolvedValue({
+        diskId: 'diskA',
+        configured: true,
+        hotTemp: 41,
+        maxTemp: 51,
+        smSelect: null,
+        smLevel: null,
+        notifyAttributes: null,
+        defaultNotifyAttributes: [5, 187, 197, 198, 199],
+        preselectAttributes: [5, 187, 188, 197, 198, 199],
+      }),
+      resetDiskSmartSettings: vi.fn().mockResolvedValue({ ...{
+        diskId: 'diskA',
+        configured: true,
+        hotTemp: 41,
+        maxTemp: 51,
+        smSelect: null,
+        smLevel: null,
+        notifyAttributes: null,
+        defaultNotifyAttributes: [5, 187, 197, 198, 199],
+        preselectAttributes: [5, 187, 188, 197, 198, 199],
+      }, configured: false }),
       subscribeDockerContainerStats: vi.fn().mockResolvedValue((async function* () {})()),
       ...overrides,
     },
@@ -377,5 +392,93 @@ describe('resolvers.Subscription.dockerContainerStats', () => {
     expect(result).toBe(fakeIterable);
     // Explicit resolve: payload -> payload, no reshaping (D7).
     expect(resolvers.Subscription.dockerContainerStats.resolve(batch)).toBe(batch);
+  });
+});
+
+describe('resolvers.Query.diskSmartSettings', () => {
+  it('is NOT permission-gated -- resolves for a read-only caller', async () => {
+    const diskSmartSettings = vi.fn().mockResolvedValue({ diskId: 'diskA', configured: false });
+    const context = makeContext({ diskSmartSettings }, makeIdentity('read-only'));
+
+    await resolvers.Query.diskSmartSettings({}, { diskId: 'diskA' }, context);
+
+    expect(diskSmartSettings).toHaveBeenCalledWith('diskA');
+  });
+
+  // The root resolver must NOT run the id through stripPrefixedId: that splits at
+  // the last colon and would turn this real flash id into "0".
+  it('forwards the disk id verbatim, colons and all', async () => {
+    const diskSmartSettings = vi.fn().mockResolvedValue({ diskId: 'x', configured: false });
+    const context = makeContext({ diskSmartSettings });
+    const raw = `${'0123456789abcdef'.repeat(4)}:Samsung_Flash_Drive_0374922050003774-0:0`;
+
+    await resolvers.Query.diskSmartSettings({}, { diskId: raw }, context);
+
+    expect(diskSmartSettings).toHaveBeenCalledWith(raw);
+  });
+});
+
+describe('resolvers.Query.allDiskSmartSettings', () => {
+  it('is NOT permission-gated and takes no arguments', async () => {
+    const allDiskSmartSettings = vi.fn().mockResolvedValue([]);
+    const context = makeContext({ allDiskSmartSettings }, makeIdentity('read-only'));
+
+    const result = await resolvers.Query.allDiskSmartSettings({}, {}, context);
+
+    expect(allDiskSmartSettings).toHaveBeenCalledWith();
+    expect(result).toEqual([]);
+  });
+});
+
+describe('resolvers.Mutation.updateDiskSmartSettings', () => {
+  const input = {
+    hotTemp: 41,
+    maxTemp: 51,
+    smSelect: null,
+    smLevel: null,
+    notifyAttributes: null,
+  };
+
+  it('throws PermissionError for a read-only identity', () => {
+    const context = makeContext({}, makeIdentity('read-only'));
+
+    expect(() =>
+      resolvers.Mutation.updateDiskSmartSettings({}, { diskId: 'diskA', input }, context),
+    ).toThrow(PermissionError);
+  });
+
+  it('delegates with the id verbatim and the caller attached', async () => {
+    const updateDiskSmartSettings = vi.fn().mockResolvedValue({ diskId: 'diskA', configured: true });
+    const context = makeContext({ updateDiskSmartSettings });
+
+    await resolvers.Mutation.updateDiskSmartSettings({}, { diskId: 'diskA', input }, context);
+
+    expect(updateDiskSmartSettings).toHaveBeenCalledWith('diskA', input, expect.anything());
+  });
+});
+
+describe('resolvers.Mutation.resetDiskSmartSettings', () => {
+  it('throws PermissionError for a read-only identity', () => {
+    const context = makeContext({}, makeIdentity('read-only'));
+
+    expect(() =>
+      resolvers.Mutation.resetDiskSmartSettings({}, { diskId: 'diskA' }, context),
+    ).toThrow(PermissionError);
+  });
+
+  it('delegates and reports the disk as no longer configured', async () => {
+    const resetDiskSmartSettings = vi
+      .fn()
+      .mockResolvedValue({ diskId: 'diskA', configured: false });
+    const context = makeContext({ resetDiskSmartSettings });
+
+    const result = await resolvers.Mutation.resetDiskSmartSettings(
+      {},
+      { diskId: 'diskA' },
+      context,
+    );
+
+    expect(resetDiskSmartSettings).toHaveBeenCalledWith('diskA', expect.anything());
+    expect(result.configured).toBe(false);
   });
 });
