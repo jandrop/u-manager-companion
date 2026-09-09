@@ -39,7 +39,6 @@ from companion.patches import (
     parity_status,
     plugin_check,
     plugins,
-    power,
     shares,
     unassigned_devices,
 )
@@ -49,7 +48,6 @@ def main() -> int:
     results = [
         network.apply(),
         docker.apply(),
-        power.apply(),
         plugins.apply(),
         plugin_check.apply(),
         shares.apply(),
