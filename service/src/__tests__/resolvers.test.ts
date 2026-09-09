@@ -85,6 +85,10 @@ function makeContext(overrides: Partial<GraphqlContext['deps']> = {}, identity =
         defaultNotifyAttributes: [5, 187, 197, 198, 199],
         preselectAttributes: [5, 187, 188, 197, 198, 199],
       }, configured: false }),
+      updateDiskUtilizationThresholds: vi.fn().mockResolvedValue(true),
+      diskIdentifiers: vi.fn().mockResolvedValue([
+        { diskId: 'WDC_WD30NPRZ-11YRMT0_WD-WX31DB60NPU8', device: '/dev/sde', slot: 'disk1', idx: 1, assigned: true },
+      ]),
       subscribeDockerContainerStats: vi.fn().mockResolvedValue((async function* () {})()),
       ...overrides,
     },
@@ -354,6 +358,58 @@ describe('resolvers.Mutation.updateDiskThresholds', () => {
   });
 });
 
+describe('resolvers.Mutation.updateDiskUtilizationThresholds', () => {
+  it('throws PermissionError for a read-only identity', () => {
+    const context = makeContext({}, makeIdentity('read-only'));
+
+    expect(() =>
+      resolvers.Mutation.updateDiskUtilizationThresholds(
+        {},
+        { diskIdx: 1, warning: 80 },
+        context,
+      ),
+    ).toThrow(PermissionError);
+  });
+
+  it('calls through to context.deps.updateDiskUtilizationThresholds for a full-authority identity', async () => {
+    const updateDiskUtilizationThresholds = vi.fn().mockResolvedValue(true);
+    const context = makeContext({ updateDiskUtilizationThresholds }, makeIdentity('full'));
+    const args = { diskIdx: 2, warning: 70, critical: 90 };
+
+    const result = await resolvers.Mutation.updateDiskUtilizationThresholds({}, args, context);
+
+    expect(updateDiskUtilizationThresholds).toHaveBeenCalledWith(args, expect.anything());
+    expect(result).toBe(true);
+  });
+
+  it('forwards an omitted field as ABSENT, not as null -- key presence is the contract', async () => {
+    const updateDiskUtilizationThresholds = vi.fn().mockResolvedValue(true);
+    const context = makeContext({ updateDiskUtilizationThresholds }, makeIdentity('full'));
+
+    await resolvers.Mutation.updateDiskUtilizationThresholds({}, { diskIdx: 1, critical: 90 }, context);
+
+    const forwarded = updateDiskUtilizationThresholds.mock.calls[0]![0];
+    expect('warning' in forwarded).toBe(false);
+    expect(forwarded).toEqual({ diskIdx: 1, critical: 90 });
+  });
+
+  it('forwards an explicit null through untouched -- null CLEARS the field', async () => {
+    const updateDiskUtilizationThresholds = vi.fn().mockResolvedValue(true);
+    const context = makeContext({ updateDiskUtilizationThresholds }, makeIdentity('full'));
+
+    await resolvers.Mutation.updateDiskUtilizationThresholds(
+      {},
+      { diskIdx: 1, warning: null },
+      context,
+    );
+
+    expect(updateDiskUtilizationThresholds).toHaveBeenCalledWith(
+      { diskIdx: 1, warning: null },
+      expect.anything(),
+    );
+  });
+});
+
 describe('resolvers.Subscription.dockerInstallUpdates', () => {
   it('subscribes to the channel derived from the operation id', () => {
     const snapshot = createOperation('DOCKER_INSTALL', { containerName: 'plex', repository: 'r' });
@@ -427,6 +483,25 @@ describe('resolvers.Query.allDiskSmartSettings', () => {
 
     expect(allDiskSmartSettings).toHaveBeenCalledWith();
     expect(result).toEqual([]);
+  });
+});
+
+describe('resolvers.Query.diskIdentifiers', () => {
+  it('is NOT permission-gated and takes no arguments', async () => {
+    const record = {
+      diskId: 'ST9250410AS_5VG0SM9X',
+      device: '/dev/sdj',
+      slot: 'dev1',
+      idx: null,
+      assigned: false,
+    };
+    const diskIdentifiers = vi.fn().mockResolvedValue([record]);
+    const context = makeContext({ diskIdentifiers }, makeIdentity('read-only'));
+
+    const result = await resolvers.Query.diskIdentifiers({}, {}, context);
+
+    expect(diskIdentifiers).toHaveBeenCalledWith();
+    expect(result).toEqual([record]);
   });
 });
 

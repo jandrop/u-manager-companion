@@ -76,6 +76,13 @@ const DEFAULT_DYNAMIX_DEFAULTS_PATH =
  * returns every disk to stock. features/disk_smart is the only consumer. */
 const DEFAULT_SMART_ONE_CFG_PATH = '/boot/config/smart-one.cfg';
 
+/** emhttpd's runtime state, the only source of Unraid's device id. Under
+ * /var/local (tmpfs), rewritten at runtime, so neither is user config, and
+ * devs.ini is absent on a box with no unassigned devices.
+ * features/disk_identifiers is the only consumer. */
+const DEFAULT_DISKS_INI_PATH = '/var/local/emhttp/disks.ini';
+const DEFAULT_DEVS_INI_PATH = '/var/local/emhttp/devs.ini';
+
 export interface CompanionConfig {
   /** Loopback-only port the Apollo/graphql-ws server binds. */
   readonly servicePort: number;
@@ -120,6 +127,10 @@ export interface CompanionConfig {
   /** Per-disk SMART settings file path
    * (features/disk_smart/platform.ts's createSmartConfigClient()). */
   readonly smartOneConfigPath: string;
+  /** emhttp's array-slot state file (features/disk_identifiers). */
+  readonly disksIniPath: string;
+  /** emhttp's unassigned-device state file (features/disk_identifiers). */
+  readonly devsIniPath: string;
 }
 
 /** Parses a boolean-ish env value ('1'/'true' => true, anything else => the
@@ -170,5 +181,7 @@ export function resolveCompanionConfig(env: NodeJS.ProcessEnv = process.env): Co
       env['COMPANION_DYNAMIX_DEFAULTS_PATH'] ?? DEFAULT_DYNAMIX_DEFAULTS_PATH,
     dynamixConfigPath: env['COMPANION_DYNAMIX_CONFIG_PATH'] ?? DEFAULT_DYNAMIX_CFG_PATH,
     smartOneConfigPath: env['COMPANION_SMART_ONE_CONFIG_PATH'] ?? DEFAULT_SMART_ONE_CFG_PATH,
+    disksIniPath: env['COMPANION_DISKS_INI_PATH'] ?? DEFAULT_DISKS_INI_PATH,
+    devsIniPath: env['COMPANION_DEVS_INI_PATH'] ?? DEFAULT_DEVS_INI_PATH,
   };
 }

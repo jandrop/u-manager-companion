@@ -78,6 +78,9 @@ type Query {
 
   "Every disk that smart-one.cfg holds a section for, in file order. A disk with no override is ABSENT from this list rather than present with null values, so a caller can build its lookup straight from it and treat a miss as \"inherits\". A missing file is an empty list, not an error. Ungated, same posture as diskSmartSettings. Exists so a client can grade every disk against its own effective threshold in one request instead of one request per disk."
   allDiskSmartSettings: [DiskSmartSettings!]!
+
+  "Every addressable disk and unassigned device, with the identifiers the per-disk mutations take. Exists because NO query on either endpoint returns Unraid's own device id: the native `Disk.id` is `<serverId>:<serialNum>` and `unassignedDevicesInfo` carries no id at all, while the id `updateDiskSmartSettings` needs is the section key in smart-one.cfg (e.g. `ST9250410AS_5VG0SM9X`). Read straight from emhttp's disks.ini/devs.ini -- do NOT rebuild it from `name` + `serialNum`, that rule breaks on the USB flash device, whose real id prepends the vendor and appends SCSI topology. Assigned disks first, then unassigned devices, each in file order. A slot with no id (an empty array slot) is ABSENT, and a missing state file contributes no entries rather than failing. Ungated, same posture as diskSmartSettings."
+  diskIdentifiers: [DiskIdentifier!]!
 }
 
 type Mutation {
@@ -108,6 +111,8 @@ type Mutation {
 
   "Deletes one disk's ENTIRE section, mirroring the webGUI's DEFAULT button -- unmodeled controller keys go with it. The file itself is unlinked only when no section remains, so a sibling disk's settings are never collateral. Returns the resulting unconfigured record."
   resetDiskSmartSettings(diskId: PrefixedID!): DiskSmartSettings!
+  "Sets ONE disk's utilization warning/critical thresholds (percent), keyed by the disk's slot index, via emhttpd's `changeDisk` command. PARTIAL by contract, unlike updateDiskThresholds: an OMITTED argument is not sent and keeps its current value, an explicit null CLEARS it so the disk inherits the global threshold, and a number sets it. 0 is a real value -- every Unraid consumer guards on `limit > 0`, so it disables that band rather than warning always. Read the current values from the native API's `array { disks { idx warning critical } }`; this service does not duplicate them."
+  updateDiskUtilizationThresholds(diskIdx: Int!, warning: Int, critical: Int): Boolean!
 }
 
 type Subscription {
@@ -469,6 +474,24 @@ input DiskSmartSettingsInput {
   smLevel: Float
   "The effective monitored set. The default set is stored as an absent key, exactly like the webGUI blanking it."
   notifyAttributes: [Int!]
+}
+
+# ---------------------------------------------------------------------------
+# Disk identifiers
+# ---------------------------------------------------------------------------
+
+"One addressable device, as emhttp's own state files describe it. Carries the addressing for BOTH per-disk mutations: `diskId` for updateDiskSmartSettings/resetDiskSmartSettings and `idx` for updateDiskUtilizationThresholds."
+type DiskIdentifier {
+  "Unraid's device id, verbatim from the ini -- the value to pass as `diskId` to updateDiskSmartSettings/resetDiskSmartSettings, which write it as the `[<diskId>]` section name in smart-one.cfg. Carried through byte-for-byte, colons included."
+  diskId: String!
+  "The device node, normalised to `/dev/sdX` so a client can join directly against the native `Disk.device` and `unassignedDevicesInfo.device`, which both use that shape. The ini stores it bare (`sdj`). Empty (never a bare `/dev/`) for the rare slot that carries an id but no device yet."
+  device: String!
+  "The ini section name: `disk1`, `parity`, `cache`, `flash`, `dev1`. Use it to label rows, or to filter out the boot device."
+  slot: String!
+  "The array slot index, i.e. the `diskIdx` updateDiskUtilizationThresholds takes. Null for unassigned devices, which occupy no slot."
+  idx: Int
+  "True for array-assigned disks (disks.ini), false for unassigned devices (devs.ini). Per-disk utilization thresholds exist only for assigned disks, so a client uses this to decide whether that control applies."
+  assigned: Boolean!
 }
 
 # ---------------------------------------------------------------------------
