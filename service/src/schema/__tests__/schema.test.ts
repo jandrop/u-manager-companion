@@ -57,6 +57,7 @@ describe('schema.graphql', () => {
         'diskThresholds',
         'diskSmartSettings',
         'allDiskSmartSettings',
+        'diskIdentifiers',
       ].sort(),
     );
   });
@@ -127,6 +128,35 @@ describe('schema.graphql', () => {
     expect(field).toBeDefined();
     // Non-null list: "no disk has an override" is [], never null.
     expect(field.type.toString()).toBe('[DiskSmartSettings!]!');
+    expect(field.args).toEqual([]);
+  });
+
+  it('DiskIdentifier carries a non-null diskId/device/slot/assigned and a nullable idx', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+
+    const outputType = schema.getType('DiskIdentifier') as import('graphql').GraphQLObjectType;
+    expect(outputType).toBeDefined();
+    const fields = outputType.getFields();
+    expect(Object.keys(fields).sort()).toEqual(
+      ['diskId', 'device', 'slot', 'idx', 'assigned'].sort(),
+    );
+    // Plain String, not PrefixedID: the value is Unraid's own id, never prefixed.
+    expect(fields['diskId']!.type.toString()).toBe('String!');
+    expect(fields['device']!.type.toString()).toBe('String!');
+    expect(fields['slot']!.type.toString()).toBe('String!');
+    // Nullable: an unassigned device occupies no array slot.
+    expect(fields['idx']!.type.toString()).toBe('Int');
+    expect(fields['assigned']!.type.toString()).toBe('Boolean!');
+  });
+
+  it('diskIdentifiers is a non-null list of non-null records, and takes no args', () => {
+    const sdl = readFileSync(SDL_PATH, 'utf8');
+    const schema = buildSchema(sdl);
+
+    const field = schema.getQueryType()!.getFields()['diskIdentifiers']!;
+    expect(field).toBeDefined();
+    expect(field.type.toString()).toBe('[DiskIdentifier!]!');
     expect(field.args).toEqual([]);
   });
 
@@ -205,6 +235,7 @@ describe('CAPABILITY_KEYS', () => {
         'docker.templateFixedIp',
         'docker.stats',
         'diskSmartSettings',
+        'diskIdentifiers',
       ].sort(),
     );
   });

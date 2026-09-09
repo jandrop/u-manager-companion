@@ -96,6 +96,8 @@ import {
   updateDiskSmartSettings,
 } from './features/disk_smart/resolvers.js';
 import { createSmartConfigClient } from './features/disk_smart/platform.js';
+import { listDiskIdentifiers } from './features/disk_identifiers/resolvers.js';
+import { createDiskStateClient } from './features/disk_identifiers/platform.js';
 import { subscribeDockerContainerStats } from './features/docker_stats/stats.js';
 import { existsSync, promises as fsPromises } from 'node:fs';
 import path from 'node:path';
@@ -229,6 +231,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
   const pluginManifestClient = createPluginManifestClient();
   const dynamixConfigClient = createDynamixConfigClient(config.dynamixConfigPath, config.dynamixDefaultsPath);
   const smartConfigClient = createSmartConfigClient(config.smartOneConfigPath);
+  const diskStateClient = createDiskStateClient(config.disksIniPath, config.devsIniPath);
 
   return {
     installDockerTemplate: (input) =>
@@ -307,6 +310,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
       resetDiskSmartSettings(diskId, { client: smartConfigClient, audit, caller }),
     updateDiskThresholds: (input) =>
       updateDiskThresholds(input, { client: dynamixConfigClient, audit, caller }),
+    diskIdentifiers: () => listDiskIdentifiers({ client: diskStateClient }),
     // Reuses the emhttpd client shares already builds -- disk_utilization
     // depends only on its sendCommand.
     updateDiskUtilizationThresholds: (input) =>

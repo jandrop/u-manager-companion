@@ -86,6 +86,9 @@ function makeContext(overrides: Partial<GraphqlContext['deps']> = {}, identity =
         preselectAttributes: [5, 187, 188, 197, 198, 199],
       }, configured: false }),
       updateDiskUtilizationThresholds: vi.fn().mockResolvedValue(true),
+      diskIdentifiers: vi.fn().mockResolvedValue([
+        { diskId: 'WDC_WD30NPRZ-11YRMT0_WD-WX31DB60NPU8', device: '/dev/sde', slot: 'disk1', idx: 1, assigned: true },
+      ]),
       subscribeDockerContainerStats: vi.fn().mockResolvedValue((async function* () {})()),
       ...overrides,
     },
@@ -480,6 +483,25 @@ describe('resolvers.Query.allDiskSmartSettings', () => {
 
     expect(allDiskSmartSettings).toHaveBeenCalledWith();
     expect(result).toEqual([]);
+  });
+});
+
+describe('resolvers.Query.diskIdentifiers', () => {
+  it('is NOT permission-gated and takes no arguments', async () => {
+    const record = {
+      diskId: 'ST9250410AS_5VG0SM9X',
+      device: '/dev/sdj',
+      slot: 'dev1',
+      idx: null,
+      assigned: false,
+    };
+    const diskIdentifiers = vi.fn().mockResolvedValue([record]);
+    const context = makeContext({ diskIdentifiers }, makeIdentity('read-only'));
+
+    const result = await resolvers.Query.diskIdentifiers({}, {}, context);
+
+    expect(diskIdentifiers).toHaveBeenCalledWith();
+    expect(result).toEqual([record]);
   });
 });
 

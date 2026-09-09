@@ -35,6 +35,7 @@ export const CAPABILITY_KEYS = [
   'diskThresholds',
   'diskSmartSettings',
   'diskUtilizationThresholds',
+  'diskIdentifiers',
   // Detection-only: tells the app this build reads and preserves <MyIP>,
   // so it can route template traffic here instead of /graphql.
   'docker.templateFixedIp',

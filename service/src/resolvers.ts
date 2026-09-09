@@ -52,6 +52,7 @@ import type {
   DiskSmartSettingsRecord,
 } from './features/disk_smart/platform.js';
 import type { DiskUtilizationThresholdsInput } from './features/disk_utilization/resolvers.js';
+import type { DiskIdentifierRecord } from './features/disk_identifiers/platform.js';
 import type { DockerContainerStatsSample } from './features/docker_stats/map.js';
 
 // ---------------------------------------------------------------------------
@@ -144,6 +145,8 @@ export interface FeatureModuleDeps {
     input: DiskUtilizationThresholdsInput,
     caller: AuditCaller,
   ) => Promise<boolean>;
+  /** Takes no id: every identifier comes from emhttp's state files. */
+  readonly diskIdentifiers: () => Promise<readonly DiskIdentifierRecord[]>;
   /** Rejects with a GraphQLError at subscribe time if the Docker engine is
    * unreachable -- see docker_stats/stats.ts's subscribeDockerContainerStats. */
   readonly subscribeDockerContainerStats: () => Promise<AsyncIterable<readonly DockerContainerStatsSample[]>>;
@@ -433,6 +436,14 @@ export const resolvers = {
       context: GraphqlContext,
     ): Promise<readonly DiskSmartSettingsRecord[]> {
       return context.deps.allDiskSmartSettings();
+    },
+    // Read-only -- NOT permission-gated, same posture as diskSmartSettings.
+    diskIdentifiers(
+      _parent: unknown,
+      _args: unknown,
+      context: GraphqlContext,
+    ): Promise<readonly DiskIdentifierRecord[]> {
+      return context.deps.diskIdentifiers();
     },
   },
 
