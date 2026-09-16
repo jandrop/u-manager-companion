@@ -11,8 +11,8 @@
 #   gzip -n              (omit embedded mtime in gzip header)
 #
 # Output: dist/companion-<VERSION>.tar.gz (legacy patch payload +
-# supervisor/cleanup scripts) + printed SHA256 for the .plg's tarball
-# <FILE> entry.
+# supervisor/cleanup scripts + the Plugins-page icon) + printed SHA256 for
+# the .plg's tarball <FILE> entry.
 #
 # Also copies the standalone GraphQL service bundle (service/dist/bundle.cjs,
 # built separately via `npm run build` inside service/) into dist/ under
@@ -62,6 +62,7 @@ cd scripts
     --exclude='__pycache__' \
     --exclude='._*' \
     -cf - patch.py apply.sh watcher.sh service-supervisor.sh nginx-cleanup.sh companion \
+         -C .. assets/icon.png \
   | gzip -n -9 > "../${OUT}"
 cd ..
 

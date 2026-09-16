@@ -3,12 +3,11 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.09.16.1">
+<!ENTITY version "2026.09.16.2">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
-<!ENTITY icon "https://raw.githubusercontent.com/&github;/main/assets/icon.png?v=&version;">
-<!ENTITY tarball "&plgdir;/source.tar.gz">
+<!ENTITY tarball "&plgdir;/source-&version;.tar.gz">
 <!ENTITY tarballURL "https://github.com/&github;/releases/download/&version;/companion-&version;.tar.gz">
 ]>
 
@@ -16,6 +15,10 @@
 
 <CHANGES>
 <![CDATA[
+###2026.09.16.2
+- Fixed the plugin showing as not installed after a reboot when the network
+  is not up yet. It no longer re-downloads its own files on every boot.
+
 ###2026.09.16.1
 - Added per-disk SMART settings to the companion API. The app can now read
   and change the notification attributes and temperature limits Unraid
@@ -360,12 +363,6 @@
 ]]>
 </CHANGES>
 
-<!-- Plugin icon shown in the Unraid Plugins page. Unraid looks for
-     /usr/local/emhttp/plugins/<name>/<name>.png automatically. -->
-<FILE Name="/usr/local/emhttp/plugins/&name;/&name;.png">
-<URL>&icon;</URL>
-</FILE>
-
 <!-- Plugin description shown in the Plugins page. Unraid renders the
      contents of /usr/local/emhttp/plugins/<name>/README.md as Markdown. -->
 <FILE Name="/usr/local/emhttp/plugins/&name;/README.md">
@@ -456,12 +453,18 @@ pkill -f "&plgdir;/watcher.sh" 2>/dev/null
 pkill -f "&plgdir;/service-supervisor.sh" 2>/dev/null
 pkill -f "/usr/local/emhttp/plugins/&name;/service/bundle.cjs" 2>/dev/null
 
-# Step 2: extract the legacy patch payload and copy the service bundle to
-# the rootfs run dir. Unconditional every boot -- rootfs is RAM-backed and
-# is always empty again after a reboot.
+# Step 2: extract the payload, then put the icon and the service bundle in
+# the rootfs run dir, which is RAM and empty again after every boot. Unraid
+# loads the Plugins-page icon from &name;.png there.
+#
+# Unraid replays this install on every boot and skips a declared file whose
+# target already exists, so the tarball stays on /boot and a boot with no
+# internet still works. Its name carries the version, so a new release is a
+# new filename; only older ones are removed.
 tar --no-same-owner -xzf &tarball; -C &plgdir;
-rm -f &tarball;
+rm -f $(ls &plgdir;/source-*.tar.gz 2>/dev/null | grep -v '&version;')
 mkdir -p /usr/local/emhttp/plugins/&name;/service
+cp &plgdir;/assets/icon.png /usr/local/emhttp/plugins/&name;/&name;.png
 cp &plgdir;/service/bundle.cjs /usr/local/emhttp/plugins/&name;/service/bundle.cjs
 
 # Step 3: run the legacy patch pipeline fresh (dual-mode) --
