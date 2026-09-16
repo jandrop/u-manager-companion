@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.09.01.1">
+<!ENTITY version "2026.09.16.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -16,6 +16,16 @@
 
 <CHANGES>
 <![CDATA[
+###2026.09.16.1
+- Added per-disk SMART settings to the companion API. The app can now read
+  and change the notification attributes and temperature limits Unraid
+  keeps for each disk, not just the global values in Disk Settings.
+- Added per-disk utilization thresholds, so one drive can have its own
+  warning and critical percentages.
+- Removed the server power mutations from the Unraid API patch. The
+  companion service already serves them, so this drops a duplicate and
+  leaves one less file the companion touches.
+
 ###2026.09.01.1
 - Performance improvements.
 
