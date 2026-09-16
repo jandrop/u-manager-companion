@@ -384,19 +384,17 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
      rootfs run dir on every boot, since rootfs is RAM and always empty
      after reboot.
 
-     PLACEHOLDER URL/SHA256: this is LOCAL-ONLY for now (no push/PR yet) -
-     we are NOT publishing a GitHub Release for the service bundle at this
-     point. Per docs/PLUGIN_PLG_SCHEMA.md, the real URL must eventually be a
-     GitHub Releases asset (releases/download/&version;/...), never a raw
-     URL, so download counters and SHA pinning work the same way the
-     tarball already does. For LOCAL testing, place service/dist/bundle.cjs
-     on the box directly (scp) or serve it from a local HTTP server
-     reachable from the box - NOT via this placeholder URL, which does not
-     resolve to anything real yet. -->
+     The URL is a Releases asset rather than a raw one, so download counts
+     and SHA pinning work the same way the tarball already does (see
+     docs/PLUGIN_PLG_SCHEMA.md). CI builds the bundle, packages it as
+     companion-service-&version;.cjs and publishes it with the release, so
+     the URL only resolves for a published tag. To try an unreleased build,
+     push it to the box with scripts/deploy-service-dev.sh instead. -->
 <FILE Name="&plgdir;/service/bundle.cjs">
 <URL>https://github.com/&github;/releases/download/&version;/companion-service-&version;.cjs</URL>
-<!-- PLACEHOLDER: real hash computed by scripts/build.sh once the service
-     build output is included in the release pipeline. -->
+<!-- Placeholder in the source repo; CI injects the real SHA at release
+     time, anchored on this FILE block so it cannot clobber the tarball's
+     above. Keeps the committed .plg SHA-clean. -->
 <SHA256>b14502120d0a2ff821581309109b7f367f65c48300fe0371b8b89f02e68ff1b5</SHA256>
 </FILE>
 
