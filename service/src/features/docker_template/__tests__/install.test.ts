@@ -1,15 +1,3 @@
-/**
- * docker_template/install.ts tests.
- *
- * TDD: written before install.ts exists -> RED first.
- *
- * Covers the install pipeline: write template XML, pull image (progress
- * lines), run rebuild_container (streamed), idempotent start() (304 =
- * already running), audited. Platform side effects (fs write, docker pull,
- * rebuild_container process, dockerode start) are ALL injected fakes here
- * -- this suite never touches a real filesystem path under
- * /boot/config/... or a real docker socket.
- */
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditLogger } from '../../../audit.js';
 import type { DockerClient, DockerPullProgressEvent } from '../../../platform/docker-client.js';

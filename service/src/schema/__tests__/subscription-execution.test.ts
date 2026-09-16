@@ -1,11 +1,3 @@
-/**
- * dockerContainerStats driven through graphql-js's real subscribe(), not a
- * unit test of the resolver map -- the one place this repo verifies whether
- * graphql-tools passes a subscription payload through by default (D7's
- * "unverified assumption", neutralised here rather than left open).
- *
- * TDD: written before the resolver/schema wiring exists -> RED first.
- */
 import type { ExecutionResult } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 

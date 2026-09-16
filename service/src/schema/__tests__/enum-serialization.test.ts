@@ -1,16 +1,3 @@
-/**
- * DockerConfigEntryType enum resolver map -- read (serialize) and write
- * (parseValue/parseLiteral) round-trip through the REAL executable schema
- * (buildExecutableSchema() from build-schema.ts), not a hand-rolled schema
- * or an isolated unit of resolvers.ts. Deliberately does NOT reuse
- * src/__tests__/resolvers.test.ts's local makeContext factory -- extracting
- * a shared one would enlarge the diff for a second consumer that does not
- * exist (design D1/testing-strategy).
- *
- * Spec: sdd/docker-template-config-type-enum -- "DockerTemplate config
- * entries serialize as wire-case enum values" + "Install/edit writes
- * convert wire-case enum input to title-case XML".
- */
 import type { GraphQLEnumType } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -24,10 +11,6 @@ import { createOperation } from '../../operations/registry.js';
 import { buildTemplateXml, parseTemplateXml } from '../../features/docker_template/xml.js';
 import type { FeatureModuleDeps, GraphqlContext } from '../../resolvers.js';
 
-/** Minimal harness: `authority: 'full'` always short-circuits isAuthorized()
- * to true (permissions.ts), and graphql-js only invokes resolvers actually
- * named in the executed document -- so `overrides` only ever needs to
- * supply the handful of deps a given test's document touches. */
 function makeContext(overrides: Partial<FeatureModuleDeps> = {}): GraphqlContext {
   return {
     identity: { authority: 'full' } as unknown as GraphqlContext['identity'],

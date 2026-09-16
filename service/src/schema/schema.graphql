@@ -72,6 +72,15 @@ type Query {
 
   "Global disk-health thresholds read from dynamix.cfg's [display] section. Each field is nullable -- an absent key returns null rather than a substituted default, so the caller can tell 'not set' from an actual value. Ungated: any authenticated identity may read these."
   diskThresholds: DiskThresholds!
+
+  "Per-disk SMART notification and temperature overrides read from smart-one.cfg's [<diskId>] section. Never errors on a missing file or a missing section -- those read as `configured: false` with every value null. Ungated, same posture as diskThresholds."
+  diskSmartSettings(diskId: PrefixedID!): DiskSmartSettings!
+
+  "Every disk that smart-one.cfg holds a section for, in file order. A disk with no override is ABSENT from this list rather than present with null values, so a caller can build its lookup straight from it and treat a miss as \"inherits\". A missing file is an empty list, not an error. Ungated, same posture as diskSmartSettings. Exists so a client can grade every disk against its own effective threshold in one request instead of one request per disk."
+  allDiskSmartSettings: [DiskSmartSettings!]!
+
+  "Every addressable disk and unassigned device, with the identifiers the per-disk mutations take. Exists because NO query on either endpoint returns Unraid's own device id: the native `Disk.id` is `<serverId>:<serialNum>` and `unassignedDevicesInfo` carries no id at all, while the id `updateDiskSmartSettings` needs is the section key in smart-one.cfg (e.g. `ST9250410AS_5VG0SM9X`). Read straight from emhttp's disks.ini/devs.ini -- do NOT rebuild it from `name` + `serialNum`, that rule breaks on the USB flash device, whose real id prepends the vendor and appends SCSI topology. Assigned disks first, then unassigned devices, each in file order. A slot with no id (an empty array slot) is ABSENT, and a missing state file contributes no entries rather than failing. Ungated, same posture as diskSmartSettings."
+  diskIdentifiers: [DiskIdentifier!]!
 }
 
 type Mutation {
@@ -96,6 +105,14 @@ type Mutation {
 
   "Updates the six global disk-health thresholds in dynamix.cfg's [display] section. Persists all six atomically and preserves every unrelated key, key order, and every other section byte-for-byte. Returns the parse of the file that was just written."
   updateDiskThresholds(input: DiskThresholdsInput!): DiskThresholds!
+
+  "Writes one disk's SMART overrides into smart-one.cfg's [<diskId>] section, creating the file or the section on demand. `input` is TOTAL over the five modeled keys and null CLEARS a key, so the value inherits Unraid's global setting again. Unmodeled controller keys (smType, smPort1..3, smDevice, smGlue), other sections, comments, blank lines, key order and line terminators are preserved byte-for-byte. Returns the parse of the file that was just written."
+  updateDiskSmartSettings(diskId: PrefixedID!, input: DiskSmartSettingsInput!): DiskSmartSettings!
+
+  "Deletes one disk's ENTIRE section, mirroring the webGUI's DEFAULT button -- unmodeled controller keys go with it. The file itself is unlinked only when no section remains, so a sibling disk's settings are never collateral. Returns the resulting unconfigured record."
+  resetDiskSmartSettings(diskId: PrefixedID!): DiskSmartSettings!
+  "Sets ONE disk's utilization warning/critical thresholds (percent), keyed by the disk's slot index, via emhttpd's `changeDisk` command. PARTIAL by contract, unlike updateDiskThresholds: an OMITTED argument is not sent and keeps its current value, an explicit null CLEARS it so the disk inherits the global threshold, and a number sets it. 0 is a real value -- every Unraid consumer guards on `limit > 0`, so it disables that band rather than warning always. Read the current values from the native API's `array { disks { idx warning critical } }`; this service does not duplicate them."
+  updateDiskUtilizationThresholds(diskIdx: Int!, warning: Int, critical: Int): Boolean!
 }
 
 type Subscription {
@@ -417,6 +434,64 @@ input DiskThresholdsInput {
   max: Int
   hotssd: Int
   maxssd: Int
+}
+
+# ---------------------------------------------------------------------------
+# Per-disk SMART settings
+# ---------------------------------------------------------------------------
+
+"Per-disk SMART overrides from smart-one.cfg. Every value field is nullable and null means \"inherits\" -- the key is absent from the file, so Unraid's global setting applies. `smSelect`/`smLevel` are RAW numeric passthrough, deliberately not modelled as enums: the service is never stricter than the webGUI form it wraps."
+type DiskSmartSettings {
+  "The resolved section name, i.e. the disk id with any serverId prefix stripped."
+  diskId: String!
+  "True only when the file holds a [<diskId>] section. Read straight from the file, never inferred from the values."
+  configured: Boolean!
+  "Per-disk temperature warning threshold in Celsius. Celsius on the wire and in the file -- the service performs no unit conversion."
+  hotTemp: Int
+  "Per-disk temperature critical threshold in Celsius."
+  maxTemp: Int
+  "Raw SMART notification column (`smSelect`). 0 is the built-in default."
+  smSelect: Int
+  "Raw notification tolerance multiplier (`smLevel`), applied to the last notified value. 1 is the built-in default and is stored as an absent key."
+  smLevel: Float
+  "SMART attribute ids monitored for this disk (`smEvents`). Null means the disk inherits `defaultNotifyAttributes`. An empty list is rejected on input: the file format cannot express \"monitor nothing\"."
+  notifyAttributes: [Int!]
+  "Unraid's own default attribute set, served here so clients never hardcode it. Note 188 is a valid preselect code but is deliberately NOT in this default set."
+  defaultNotifyAttributes: [Int!]!
+  "The codes the webGUI renders as checkboxes, in its own order. NOT the same list as defaultNotifyAttributes: 188 is a checkbox that starts unticked. Draw the checkbox rows from THIS list and tick them from notifyAttributes (falling back to defaultNotifyAttributes when it is null); a client that draws its rows from the default set loses the 188 row and shows that code in the free-text custom box instead."
+  preselectAttributes: [Int!]!
+}
+
+"Mutation input for updateDiskSmartSettings. TOTAL over the five modeled keys: every field must be supplied and null means CLEAR, removing the key so the disk inherits Unraid's global setting. `-1` is rejected -- null is already the explicit inherit channel. `notifyAttributes: []` is rejected too: the file format cannot express \"monitor nothing\", since an empty value is blanked on write and reads back as the default set."
+input DiskSmartSettingsInput {
+  "Celsius. No unit conversion is performed."
+  hotTemp: Int
+  "Celsius. An inverted pair (hotTemp above maxTemp) is accepted -- the webGUI has no such check either."
+  maxTemp: Int
+  "Raw passthrough: an unrecognised value is persisted verbatim rather than rejected."
+  smSelect: Int
+  "Raw passthrough. Exactly 1 is stored as an absent key, and other values are written with 2 decimals to match the webGUI's <select> option values."
+  smLevel: Float
+  "The effective monitored set. The default set is stored as an absent key, exactly like the webGUI blanking it."
+  notifyAttributes: [Int!]
+}
+
+# ---------------------------------------------------------------------------
+# Disk identifiers
+# ---------------------------------------------------------------------------
+
+"One addressable device, as emhttp's own state files describe it. Carries the addressing for BOTH per-disk mutations: `diskId` for updateDiskSmartSettings/resetDiskSmartSettings and `idx` for updateDiskUtilizationThresholds."
+type DiskIdentifier {
+  "Unraid's device id, verbatim from the ini -- the value to pass as `diskId` to updateDiskSmartSettings/resetDiskSmartSettings, which write it as the `[<diskId>]` section name in smart-one.cfg. Carried through byte-for-byte, colons included."
+  diskId: String!
+  "The device node, normalised to `/dev/sdX` so a client can join directly against the native `Disk.device` and `unassignedDevicesInfo.device`, which both use that shape. The ini stores it bare (`sdj`). Empty (never a bare `/dev/`) for the rare slot that carries an id but no device yet."
+  device: String!
+  "The ini section name: `disk1`, `parity`, `cache`, `flash`, `dev1`. Use it to label rows, or to filter out the boot device."
+  slot: String!
+  "The array slot index, i.e. the `diskIdx` updateDiskUtilizationThresholds takes. Null for unassigned devices, which occupy no slot."
+  idx: Int
+  "True for array-assigned disks (disks.ini), false for unassigned devices (devs.ini). Per-disk utilization thresholds exist only for assigned disks, so a client uses this to decide whether that control applies."
+  assigned: Boolean!
 }
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,3 @@
-/**
- * docker-client.ts tests -- the NDJSON splitter + the two stream methods.
- *
- * TDD: written before the splitter/stream methods exist -> RED first.
- */
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 import type Docker from 'dockerode';
@@ -46,9 +41,6 @@ describe('createNdjsonSplitter', () => {
   });
 });
 
-/** Minimal fake dockerode ReadableStream: a plain EventEmitter plus a
- * spyable destroy(), which is everything attachHandlers/the stream methods
- * touch. Full dockerode stream typing is far larger than needed here. */
 function fakeReadable(): NodeJS.ReadableStream & { destroy: ReturnType<typeof vi.fn> } {
   const emitter = new EventEmitter();
   return Object.assign(emitter, { destroy: vi.fn() }) as unknown as NodeJS.ReadableStream & {

@@ -1,14 +1,3 @@
-/**
- * Per-request context resolution.
- *
- * Pipeline under test: extract key (HTTP header or WS connection_init
- * payload) -> keystore lookup -> `{ me }` fallback -> reject. Validated
- * results are cached by key HASH (never the raw key) with a 60s TTL --
- * the cache is the PRIMARY invalidation guarantee; fs-watch is a
- * best-effort accelerator layered on top, not exercised here.
- *
- * TDD: written before context.ts exists -> RED first.
- */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';

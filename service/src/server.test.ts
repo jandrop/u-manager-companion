@@ -1,18 +1,3 @@
-/**
- * Server wiring smoke tests -- Apollo Server v5 standalone HTTP +
- * graphql-ws WS on ONE loopback-only http.Server.
- *
- * "Local smoke test (no live box)": everything here runs against a temp-dir
- * stub filesystem (temp key store, nginx integration disabled via config)
- * -- no real box paths, no real nginx binary, no real docker socket (auth
- * succeeds via the key store fixture; nothing here exercises a privileged
- * mutation end-to-end, which is covered separately on the live box).
- *
- * Also covers listUpdatableContainerNames, the update-all target resolver
- * wired into buildFeatureModuleDeps: it maps the update-status file's image
- * repo:tag keys onto container names, which is the seam that broke
- * update-all in production.
- */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -245,9 +230,6 @@ describe('startServer -- invalid port env', () => {
   });
 });
 
-/** Nothing in listUpdatableContainerNames touches docker beyond
- * listContainers, so the rest of the DockerClient surface is a hard failure
- * rather than a silent no-op. */
 function unusedDockerCall(): never {
   throw new Error('Not reachable from listUpdatableContainerNames');
 }

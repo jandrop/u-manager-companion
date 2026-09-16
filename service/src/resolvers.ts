@@ -47,6 +47,12 @@ import type {
   ShareSettingsInput,
 } from './features/shares/platform.js';
 import type { DiskThresholdsInput, DiskThresholdsRecord } from './features/disk_thresholds/platform.js';
+import type {
+  DiskSmartSettingsInput,
+  DiskSmartSettingsRecord,
+} from './features/disk_smart/platform.js';
+import type { DiskUtilizationThresholdsInput } from './features/disk_utilization/resolvers.js';
+import type { DiskIdentifierRecord } from './features/disk_identifiers/platform.js';
 import type { DockerContainerStatsSample } from './features/docker_stats/map.js';
 
 // ---------------------------------------------------------------------------
@@ -117,10 +123,30 @@ export interface FeatureModuleDeps {
     caller: AuditCaller,
   ) => Promise<boolean>;
   readonly diskThresholds: () => Promise<DiskThresholdsRecord>;
+  /** Receives the RAW wire id -- prefix stripping and the section-name
+   * guard both live in features/disk_smart. */
+  readonly diskSmartSettings: (diskId: string) => Promise<DiskSmartSettingsRecord>;
+  /** Takes no id: the section names come from the file, so no guard runs. */
+  readonly allDiskSmartSettings: () => Promise<readonly DiskSmartSettingsRecord[]>;
+  readonly updateDiskSmartSettings: (
+    diskId: string,
+    input: DiskSmartSettingsInput,
+    caller: AuditCaller,
+  ) => Promise<DiskSmartSettingsRecord>;
+  readonly resetDiskSmartSettings: (
+    diskId: string,
+    caller: AuditCaller,
+  ) => Promise<DiskSmartSettingsRecord>;
   readonly updateDiskThresholds: (
     input: DiskThresholdsInput,
     caller: AuditCaller,
   ) => Promise<DiskThresholdsRecord>;
+  readonly updateDiskUtilizationThresholds: (
+    input: DiskUtilizationThresholdsInput,
+    caller: AuditCaller,
+  ) => Promise<boolean>;
+  /** Takes no id: every identifier comes from emhttp's state files. */
+  readonly diskIdentifiers: () => Promise<readonly DiskIdentifierRecord[]>;
   /** Rejects with a GraphQLError at subscribe time if the Docker engine is
    * unreachable -- see docker_stats/stats.ts's subscribeDockerContainerStats. */
   readonly subscribeDockerContainerStats: () => Promise<AsyncIterable<readonly DockerContainerStatsSample[]>>;
@@ -393,6 +419,32 @@ export const resolvers = {
     ): Promise<DiskThresholdsRecord> {
       return context.deps.diskThresholds();
     },
+    // Read-only -- NOT permission-gated, same posture as diskThresholds.
+    // args.diskId is forwarded VERBATIM: stripPrefixedId() splits at the
+    // LAST colon and would collapse a real disk id ending in `-0:0` to `0`.
+    diskSmartSettings(
+      _parent: unknown,
+      args: { diskId: string },
+      context: GraphqlContext,
+    ): Promise<DiskSmartSettingsRecord> {
+      return context.deps.diskSmartSettings(args.diskId);
+    },
+    // Read-only -- NOT permission-gated, same posture as diskSmartSettings.
+    allDiskSmartSettings(
+      _parent: unknown,
+      _args: unknown,
+      context: GraphqlContext,
+    ): Promise<readonly DiskSmartSettingsRecord[]> {
+      return context.deps.allDiskSmartSettings();
+    },
+    // Read-only -- NOT permission-gated, same posture as diskSmartSettings.
+    diskIdentifiers(
+      _parent: unknown,
+      _args: unknown,
+      context: GraphqlContext,
+    ): Promise<readonly DiskIdentifierRecord[]> {
+      return context.deps.diskIdentifiers();
+    },
   },
 
   Mutation: {
@@ -446,6 +498,34 @@ export const resolvers = {
     ): Promise<DiskThresholdsRecord> {
       const caller = requirePermission(context, 'diskThresholds');
       return context.deps.updateDiskThresholds(args.input, caller);
+    },
+    updateDiskSmartSettings(
+      _parent: unknown,
+      args: { diskId: string; input: DiskSmartSettingsInput },
+      context: GraphqlContext,
+    ): Promise<DiskSmartSettingsRecord> {
+      const caller = requirePermission(context, 'diskSmartSettings');
+      return context.deps.updateDiskSmartSettings(args.diskId, args.input, caller);
+    },
+    resetDiskSmartSettings(
+      _parent: unknown,
+      args: { diskId: string },
+      context: GraphqlContext,
+    ): Promise<DiskSmartSettingsRecord> {
+      const caller = requirePermission(context, 'diskSmartSettings');
+      return context.deps.resetDiskSmartSettings(args.diskId, caller);
+    },
+    updateDiskUtilizationThresholds(
+      _parent: unknown,
+      args: DiskUtilizationThresholdsInput,
+      context: GraphqlContext,
+    ): Promise<boolean> {
+      const caller = requirePermission(context, 'diskUtilizationThresholds');
+      // Forwarded as-is: KEY PRESENCE is the contract (an omitted field
+      // keeps its value, an explicit null clears it), and Apollo only
+      // populates the arguments the client actually sent. Rebuilding the
+      // object here would erase that distinction.
+      return context.deps.updateDiskUtilizationThresholds(args, caller);
     },
   },
 

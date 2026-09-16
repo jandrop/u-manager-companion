@@ -1,12 +1,3 @@
-/**
- * features/plugins/platform.ts tests.
- *
- * Covers the `.plg` manifest XML parser (entities, attributes, entity-
- * reference resolution, `<CHANGES>` extraction with/without CDATA), the
- * cached-update version extractor, and the README description cleaner.
- * Everything here is pure/synchronous parsing (no IO), so this suite
- * never touches a real filesystem.
- */
 import { describe, expect, it } from 'vitest';
 import {
   parseCachedPluginVersion,

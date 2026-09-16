@@ -1,10 +1,3 @@
-/**
- * operations/registry.ts tests.
- *
- * Pins the streaming-operation semantics: status transitions, delta-only
- * event emission, ring-buffer cap at 500 lines (drop-oldest), TTL cleanup
- * via an unref'd timer, and snapshot-after-cleanup returning null.
- */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pubsub, channelFor } from '../../pubsub';
 import {

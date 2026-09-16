@@ -1,8 +1,3 @@
-/**
- * map.ts tests -- pure raw-chunk-to-sample arithmetic.
- *
- * TDD: written before map.ts exists -> RED first.
- */
 import { describe, expect, it } from 'vitest';
 import type { DockerStatsChunk } from '../../../platform/docker-client.js';
 import { toSample } from '../map.js';

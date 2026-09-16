@@ -47,6 +47,17 @@ export class PermissionError extends Error {
   }
 }
 
+/** Thrown when a resolver argument fails validation before any IO. Distinct
+ * from the auth errors so server.ts can map it to BAD_USER_INPUT: Apollo
+ * otherwise reports a rejected argument as INTERNAL_SERVER_ERROR, which tells
+ * a client the server broke rather than that its input was wrong. */
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
 /** Validated-key cache TTL in milliseconds. Primary invalidation
  * guarantee -- holds regardless of fs-watch event delivery reliability
  * on the FAT /boot mount. */

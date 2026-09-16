@@ -1,16 +1,3 @@
-/**
- * features/shares/platform.ts tests.
- *
- * TDD: written before platform.ts exists -> RED first.
- *
- * Covers the emhttpd helpers: form-encoded POST to
- * `/var/run/emhttpd.socket` with a CSRF token read from
- * `/var/local/emhttp/var.ini`, the failure-response check, and a
- * recursive directory-empty scan under `/mnt/user/<name>` (skips
- * `.DS_Store`, stops at the first real file). Everything here is
- * injectable (socket/fs), so this suite never touches a real filesystem
- * or socket.
- */
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildShareCommands,
