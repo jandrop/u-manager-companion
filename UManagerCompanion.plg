@@ -385,7 +385,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <!-- Placeholder in the source repo; CI computes and injects the real SHA at
      release time (see .github/workflows/release.yml), same as the service
      bundle below. Keeps the committed .plg SHA-clean. -->
-<SHA256>267305ea83c0a1fe696ff3e5c8d344402ad75e113da9fba9e6e82f0d33cb8ff4</SHA256>
+<SHA256>96cf929ceaa65d4935730f97e8b3ae51dc6b0512b06470f2e72bdd16bc9177b0</SHA256>
 </FILE>
 
 <!-- The standalone GraphQL service bundle (esbuild-produced single-file CJS,
@@ -405,7 +405,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <!-- Placeholder in the source repo; CI injects the real SHA at release
      time, anchored on this FILE block so it cannot clobber the tarball's
      above. Keeps the committed .plg SHA-clean. -->
-<SHA256>b14502120d0a2ff821581309109b7f367f65c48300fe0371b8b89f02e68ff1b5</SHA256>
+<SHA256>1e88c382d3ef4e0c169323e4387783e3d0095b84a51033366cbb49a5474218fc</SHA256>
 </FILE>
 
 <!-- Runs on install AND on every boot (Unraid replays plg install on boot).
