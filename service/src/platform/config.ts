@@ -76,6 +76,11 @@ const DEFAULT_DYNAMIX_DEFAULTS_PATH =
  * returns every disk to stock. features/disk_smart is the only consumer. */
 const DEFAULT_SMART_ONE_CFG_PATH = '/boot/config/smart-one.cfg';
 
+/** emhttpd's per-disk utilization overrides, the same file
+ * `changeDisk=Apply` writes. features/disk_utilization is the only
+ * consumer. */
+const DEFAULT_DISK_CFG_PATH = '/boot/config/disk.cfg';
+
 /** emhttpd's runtime state, the only source of Unraid's device id. Under
  * /var/local (tmpfs), rewritten at runtime, so neither is user config, and
  * devs.ini is absent on a box with no unassigned devices.
@@ -127,6 +132,9 @@ export interface CompanionConfig {
   /** Per-disk SMART settings file path
    * (features/disk_smart/platform.ts's createSmartConfigClient()). */
   readonly smartOneConfigPath: string;
+  /** Per-disk utilization threshold file path
+   * (features/disk_utilization/platform.ts's createDiskConfigClient()). */
+  readonly diskCfgPath: string;
   /** emhttp's array-slot state file (features/disk_identifiers). */
   readonly disksIniPath: string;
   /** emhttp's unassigned-device state file (features/disk_identifiers). */
@@ -181,6 +189,7 @@ export function resolveCompanionConfig(env: NodeJS.ProcessEnv = process.env): Co
       env['COMPANION_DYNAMIX_DEFAULTS_PATH'] ?? DEFAULT_DYNAMIX_DEFAULTS_PATH,
     dynamixConfigPath: env['COMPANION_DYNAMIX_CONFIG_PATH'] ?? DEFAULT_DYNAMIX_CFG_PATH,
     smartOneConfigPath: env['COMPANION_SMART_ONE_CONFIG_PATH'] ?? DEFAULT_SMART_ONE_CFG_PATH,
+    diskCfgPath: env['COMPANION_DISK_CFG_PATH'] ?? DEFAULT_DISK_CFG_PATH,
     disksIniPath: env['COMPANION_DISKS_INI_PATH'] ?? DEFAULT_DISKS_INI_PATH,
     devsIniPath: env['COMPANION_DEVS_INI_PATH'] ?? DEFAULT_DEVS_INI_PATH,
   };

@@ -35,6 +35,9 @@ export const CAPABILITY_KEYS = [
   'diskThresholds',
   'diskSmartSettings',
   'diskUtilizationThresholds',
+  // Separate from the write key: an older companion serves the mutation
+  // but has no read, so the app needs its own signal.
+  'diskUtilizationThresholds.read',
   'diskIdentifiers',
   // Detection-only: tells the app this build reads and preserves <MyIP>,
   // so it can route template traffic here instead of /graphql.
