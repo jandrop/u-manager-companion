@@ -410,7 +410,7 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <!-- Placeholder in the source repo; CI injects the real SHA at release
      time, anchored on this FILE block so it cannot clobber the tarball's
      above. Keeps the committed .plg SHA-clean. -->
-<SHA256>5771986ee156c14cb214cb39d344b82af4e496a0d4feca3825729977eab0865c</SHA256>
+<SHA256>eae8ffcacfa23c702088d968ea8cdf882cde843fa993ca842bfc43cb6990f4f4</SHA256>
 </FILE>
 
 <!-- Runs on install AND on every boot (Unraid replays plg install on boot).
