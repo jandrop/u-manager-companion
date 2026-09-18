@@ -87,8 +87,12 @@ import {
 } from './features/shares/resolvers.js';
 import { createEmhttpdClient } from './features/shares/platform.js';
 import { getDiskThresholds, updateDiskThresholds } from './features/disk_thresholds/resolvers.js';
-import { updateDiskUtilizationThresholds } from './features/disk_utilization/resolvers.js';
+import {
+  getDiskUtilizationThresholds,
+  updateDiskUtilizationThresholds,
+} from './features/disk_utilization/resolvers.js';
 import { createDynamixConfigClient } from './features/disk_thresholds/platform.js';
+import { createDiskConfigClient } from './features/disk_utilization/platform.js';
 import {
   getAllDiskSmartSettings,
   getDiskSmartSettings,
@@ -231,6 +235,7 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
   const pluginManifestClient = createPluginManifestClient();
   const dynamixConfigClient = createDynamixConfigClient(config.dynamixConfigPath, config.dynamixDefaultsPath);
   const smartConfigClient = createSmartConfigClient(config.smartOneConfigPath);
+  const diskConfigClient = createDiskConfigClient(config.diskCfgPath);
   const diskStateClient = createDiskStateClient(config.disksIniPath, config.devsIniPath);
 
   return {
@@ -311,6 +316,8 @@ function buildFeatureModuleDeps(config: CompanionConfig, audit: AuditLogger, cal
     updateDiskThresholds: (input) =>
       updateDiskThresholds(input, { client: dynamixConfigClient, audit, caller }),
     diskIdentifiers: () => listDiskIdentifiers({ client: diskStateClient }),
+    diskUtilizationThresholds: (diskIdx) =>
+      getDiskUtilizationThresholds(diskIdx, { client: diskConfigClient }),
     // Reuses the emhttpd client shares already builds -- disk_utilization
     // depends only on its sendCommand.
     updateDiskUtilizationThresholds: (input) =>

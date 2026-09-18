@@ -57,6 +57,7 @@ describe('schema.graphql', () => {
         'diskThresholds',
         'diskSmartSettings',
         'allDiskSmartSettings',
+        'diskUtilizationThresholds',
         'diskIdentifiers',
       ].sort(),
     );
@@ -232,6 +233,7 @@ describe('CAPABILITY_KEYS', () => {
         'shares',
         'diskThresholds',
         'diskUtilizationThresholds',
+        'diskUtilizationThresholds.read',
         'docker.templateFixedIp',
         'docker.stats',
         'diskSmartSettings',

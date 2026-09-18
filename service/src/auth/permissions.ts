@@ -12,8 +12,9 @@
  *     query is ungated in resolvers.ts, same posture as the shares reads
  *   - updateDiskSmartSettings/resetDiskSmartSettings -> DISPLAY (update);
  *     the diskSmartSettings READ query is ungated, same posture
- *   - updateDiskUtilizationThresholds -> DISPLAY (update); per-disk
- *     thresholds have no companion read (native GraphQL serves them)
+ *   - updateDiskUtilizationThresholds -> DISPLAY (update); the
+ *     diskUtilizationThresholds READ query is ungated in resolvers.ts,
+ *     same posture as diskThresholds/diskSmartSettings above
  *   - diskIdentifiers -> DISPLAY (update) but never checked; the query is
  *     ungated in resolvers.ts, same posture as the reads above
  *   - shares mutations (create/update/delete/security/access) -> SHARE (update)
@@ -81,6 +82,10 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   // Unraid's model has no DISK resource, so per-disk utilization gates on
   // DISPLAY:update like diskThresholds above.
   diskUtilizationThresholds: { resource: 'DISPLAY', action: 'update' },
+  // Never checked -- the diskUtilizationThresholds READ query is ungated
+  // in resolvers.ts. Present only because this map is total over
+  // CapabilityKey.
+  'diskUtilizationThresholds.read': { resource: 'DISPLAY', action: 'update' },
   // Never checked -- the query is ungated in resolvers.ts. Present only
   // because this map is total over CapabilityKey.
   diskIdentifiers: { resource: 'DISPLAY', action: 'update' },

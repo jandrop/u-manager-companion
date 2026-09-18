@@ -3,6 +3,7 @@ import { ValidationError } from '../../../context.js';
 import type { AuditCaller, AuditLogger } from '../../../audit.js';
 import {
   buildDiskUtilizationCommands,
+  getDiskUtilizationThresholds,
   updateDiskUtilizationThresholds,
   type DiskUtilizationThresholdsInput,
 } from '../resolvers.js';
@@ -29,6 +30,34 @@ async function run(input: DiskUtilizationThresholdsInput, response?: string) {
   const result = await updateDiskUtilizationThresholds(input, deps);
   return { ...deps, result };
 }
+
+describe('getDiskUtilizationThresholds', () => {
+  it('returns the parsed record for the requested slot', async () => {
+    const readText = vi.fn().mockResolvedValue('diskWarning.3="75"\ndiskCritical.3="95"\n');
+
+    const result = await getDiskUtilizationThresholds(3, { client: { readText } });
+
+    expect(result).toEqual({ diskIdx: 3, warning: 75, critical: 95 });
+  });
+
+  it('does not require an audit dependency', async () => {
+    const readText = vi.fn().mockResolvedValue('');
+    await expect(getDiskUtilizationThresholds(1, { client: { readText } })).resolves.toBeDefined();
+  });
+
+  it.each([
+    ['zero', 0],
+    ['negative', -2],
+    ['fractional', 1.5],
+  ] as const)('rejects a %s diskIdx without reading the file', async (_label, diskIdx) => {
+    const readText = vi.fn();
+
+    await expect(
+      getDiskUtilizationThresholds(diskIdx, { client: { readText } }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(readText).not.toHaveBeenCalled();
+  });
+});
 
 describe('buildDiskUtilizationCommands', () => {
   it('emits only the fields the caller named, keyed by slot index', () => {

@@ -63,6 +63,7 @@ function makeContext(overrides: Partial<GraphqlContext['deps']> = {}, identity =
         preselectAttributes: [5, 187, 188, 197, 198, 199],
       }),
       allDiskSmartSettings: vi.fn().mockResolvedValue([]),
+      diskUtilizationThresholds: vi.fn().mockResolvedValue({ diskIdx: 1, warning: null, critical: null }),
       updateDiskSmartSettings: vi.fn().mockResolvedValue({
         diskId: 'diskA',
         configured: true,
@@ -483,6 +484,18 @@ describe('resolvers.Query.allDiskSmartSettings', () => {
 
     expect(allDiskSmartSettings).toHaveBeenCalledWith();
     expect(result).toEqual([]);
+  });
+});
+
+describe('resolvers.Query.diskUtilizationThresholds', () => {
+  it('is NOT permission-gated -- calls context.deps.diskUtilizationThresholds(diskIdx) for a read-only caller', async () => {
+    const diskUtilizationThresholds = vi.fn().mockResolvedValue({ diskIdx: 3, warning: 80, critical: 90 });
+    const context = makeContext({ diskUtilizationThresholds }, makeIdentity('read-only'));
+
+    const result = await resolvers.Query.diskUtilizationThresholds({}, { diskIdx: 3 }, context);
+
+    expect(diskUtilizationThresholds).toHaveBeenCalledWith(3);
+    expect(result).toEqual({ diskIdx: 3, warning: 80, critical: 90 });
   });
 });
 

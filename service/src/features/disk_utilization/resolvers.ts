@@ -1,14 +1,15 @@
 /**
  * Disk-utilization feature module.
  *
- * Backs the SDL's `updateDiskUtilizationThresholds` mutation. Per-disk
- * warning/critical utilization percentages live in `/boot/config/disk.cfg`
- * as `diskWarning.<idx>`/`diskCritical.<idx>`, owned by emhttpd and keyed
- * by the disk's SLOT INDEX. `src/resolvers.ts` binds this with permission
- * gating; all IO goes through the injected command sender.
+ * Backs the SDL's `updateDiskUtilizationThresholds` mutation and the
+ * `diskUtilizationThresholds(diskIdx)` query. The percentages live in
+ * `/boot/config/disk.cfg`, owned by emhttpd. `src/resolvers.ts` binds the
+ * mutation with permission gating; its IO goes through the injected
+ * command sender.
  *
- * There is no read counterpart on purpose: the native Unraid API already
- * serves these as `array { disks { idx warning critical } }`.
+ * The native API's `array { disks { warning critical } }` can lag a
+ * `changeDisk=Apply` write, so the query reads disk.cfg directly, the
+ * same file the mutation just wrote.
  *
  * PARTIAL by contract -- an omitted field is not sent, so it keeps its
  * current value. This is the OPPOSITE of the sibling `updateDiskThresholds`
@@ -19,6 +20,8 @@
 import { ValidationError } from '../../context.js';
 import type { AuditCaller, AuditLogger } from '../../audit.js';
 import { isEmhttpdFailureResponse, type EmhttpdCommands } from '../shares/platform.js';
+import type { DiskConfigClient, DiskUtilizationThresholdsRecord } from './platform.js';
+import { parseDiskUtilizationThresholds } from './platform.js';
 
 /** The one method this module needs off shares' EmhttpdClient -- never
  * the share-specific reads. server.ts wires it from the client it
@@ -45,6 +48,10 @@ interface MutationDeps {
   readonly caller: AuditCaller;
 }
 
+interface QueryDeps {
+  readonly client: DiskConfigClient;
+}
+
 const PERCENTAGE_MIN = 0;
 const PERCENTAGE_MAX = 100;
 
@@ -57,19 +64,32 @@ function validatePercentage(field: string, value: number): void {
   }
 }
 
+function validateDiskIdx(diskIdx: number): void {
+  if (!Number.isInteger(diskIdx) || diskIdx < 1) {
+    throw new ValidationError('diskIdx must be a positive integer.');
+  }
+}
+
 /** Fail-fast before any IO, per validateShareName()'s pattern. An
  * inverted pair (warning above critical) is deliberately ACCEPTED: the
  * webGUI has no such check and this service is never stricter than the
  * surface it wraps. A null needs no range check -- it clears the field. */
 function validateInput(input: DiskUtilizationThresholdsInput): void {
-  if (!Number.isInteger(input.diskIdx) || input.diskIdx < 1) {
-    throw new ValidationError('diskIdx must be a positive integer.');
-  }
+  validateDiskIdx(input.diskIdx);
   if (input.warning === undefined && input.critical === undefined) {
     throw new ValidationError('Provide warning, critical, or both -- nothing to update.');
   }
   if (input.warning != null) validatePercentage('warning', input.warning);
   if (input.critical != null) validatePercentage('critical', input.critical);
+}
+
+/** Backs `Query.diskUtilizationThresholds(diskIdx)`. Reads are not audited. */
+export async function getDiskUtilizationThresholds(
+  diskIdx: number,
+  deps: QueryDeps,
+): Promise<DiskUtilizationThresholdsRecord> {
+  validateDiskIdx(diskIdx);
+  return parseDiskUtilizationThresholds(await deps.client.readText(), diskIdx);
 }
 
 /** Maps the input to a `changeDisk=Apply` payload carrying ONLY the

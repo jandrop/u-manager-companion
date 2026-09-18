@@ -52,6 +52,7 @@ import type {
   DiskSmartSettingsRecord,
 } from './features/disk_smart/platform.js';
 import type { DiskUtilizationThresholdsInput } from './features/disk_utilization/resolvers.js';
+import type { DiskUtilizationThresholdsRecord } from './features/disk_utilization/platform.js';
 import type { DiskIdentifierRecord } from './features/disk_identifiers/platform.js';
 import type { DockerContainerStatsSample } from './features/docker_stats/map.js';
 
@@ -141,6 +142,7 @@ export interface FeatureModuleDeps {
     input: DiskThresholdsInput,
     caller: AuditCaller,
   ) => Promise<DiskThresholdsRecord>;
+  readonly diskUtilizationThresholds: (diskIdx: number) => Promise<DiskUtilizationThresholdsRecord>;
   readonly updateDiskUtilizationThresholds: (
     input: DiskUtilizationThresholdsInput,
     caller: AuditCaller,
@@ -436,6 +438,14 @@ export const resolvers = {
       context: GraphqlContext,
     ): Promise<readonly DiskSmartSettingsRecord[]> {
       return context.deps.allDiskSmartSettings();
+    },
+    // Read-only -- NOT permission-gated, same posture as diskSmartSettings.
+    diskUtilizationThresholds(
+      _parent: unknown,
+      args: { diskIdx: number },
+      context: GraphqlContext,
+    ): Promise<DiskUtilizationThresholdsRecord> {
+      return context.deps.diskUtilizationThresholds(args.diskIdx);
     },
     // Read-only -- NOT permission-gated, same posture as diskSmartSettings.
     diskIdentifiers(
