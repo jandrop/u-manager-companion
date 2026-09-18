@@ -455,7 +455,7 @@ type DiskSmartSettings {
   maxTemp: Int
   "Raw SMART notification column (`smSelect`). 0 is the built-in default."
   smSelect: Int
-  "Raw notification tolerance multiplier (`smLevel`), applied to the last notified value. 1 is the built-in default and is stored as an absent key."
+  "Raw notification tolerance multiplier (`smLevel`), applied to the last notified value. 1 is the built-in default."
   smLevel: Float
   "SMART attribute ids monitored for this disk (`smEvents`). Null means the disk inherits `defaultNotifyAttributes`. An empty list is rejected on input: the file format cannot express \"monitor nothing\"."
   notifyAttributes: [Int!]
@@ -473,7 +473,7 @@ input DiskSmartSettingsInput {
   maxTemp: Int
   "Raw passthrough: an unrecognised value is persisted verbatim rather than rejected."
   smSelect: Int
-  "Raw passthrough. Exactly 1 is stored as an absent key, and other values are written with 2 decimals to match the webGUI's <select> option values."
+  "Raw passthrough, written with 2 decimals to match the webGUI's <select> option values."
   smLevel: Float
   "The effective monitored set. The default set is stored as an absent key, exactly like the webGUI blanking it."
   notifyAttributes: [Int!]
