@@ -112,8 +112,10 @@ function isDefaultSet(codes: readonly number[]): boolean {
   );
 }
 
-/** Domain input -> file values. `null` clears the key. smLevel of exactly 1 and
- * the default attribute set both write as absent, matching the webGUI. */
+/** Domain input -> file values. `null` clears the key. The default attribute
+ * set writes as absent, matching the webGUI. smLevel 1 is stored as "1.00"
+ * like any other value: that is what its webGUI option carries, and an
+ * absent key would inherit the global instead. */
 export function toFileValues(input: DiskSmartSettingsInput): ReadonlyMap<string, string | null> {
   const codes = input.notifyAttributes === null ? null : canonicalAttributes(input.notifyAttributes);
   const custom = codes === null ? [] : codes.filter((code) => !isPreselect(code));
@@ -124,7 +126,7 @@ export function toFileValues(input: DiskSmartSettingsInput): ReadonlyMap<string,
     ['hotTemp', input.hotTemp === null ? null : String(input.hotTemp)],
     ['maxTemp', input.maxTemp === null ? null : String(input.maxTemp)],
     ['smSelect', input.smSelect === null ? null : String(input.smSelect)],
-    ['smLevel', input.smLevel === null || input.smLevel === 1 ? null : input.smLevel.toFixed(2)],
+    ['smLevel', input.smLevel === null ? null : input.smLevel.toFixed(2)],
     ['smEvents', smEvents],
     ['smCustom', smEvents === null || custom.length === 0 ? null : custom.join(',')],
   ]);

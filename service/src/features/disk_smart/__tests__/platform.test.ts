@@ -227,18 +227,19 @@ describe('toFileValues -- temperatures and raw passthrough', () => {
 });
 
 describe('toFileValues -- smLevel byte format', () => {
-  it('stores smLevel exactly 1 as an ABSENT key', () => {
-    expect(fileValues({ smLevel: 1 })).toMatchObject({ smLevel: null });
-  });
-
   it.each([
     // The webGUI renders smLevel through a <select> of 2-decimal strings, so
     // "1.5" would match no option and the form would fall back to the first.
+    [1, '1.00'],
     [1.5, '1.50'],
     [2, '2.00'],
     [1.25, '1.25'],
   ])('writes smLevel %s with two decimals as "%s"', (value, expected) => {
     expect(fileValues({ smLevel: value })).toMatchObject({ smLevel: expected });
+  });
+
+  it('clears smLevel only when it is null', () => {
+    expect(fileValues({ smLevel: null })).toMatchObject({ smLevel: null });
   });
 });
 
