@@ -413,6 +413,18 @@ Patches Unraid's GraphQL API to expose extra data and fix bugs the U-Manager mob
 <SHA256>eae8ffcacfa23c702088d968ea8cdf882cde843fa993ca842bfc43cb6990f4f4</SHA256>
 </FILE>
 
+<!-- python3 for apply.sh / patch.py. Stock Unraid 7.x has no python3, so
+     apply.sh installs this package when python3 is missing. It is declared
+     here, with its SHA256, so Unraid's plugin command verifies it before
+     anything uses it, and it stays on /boot so a boot with no internet
+     still works. The python-deps release is not tied to plugin versions,
+     so this SHA only changes when the python version does; CI does not
+     touch it. -->
+<FILE Name="&plgdir;/python3-3.12.10-x86_64-1.txz">
+<URL>https://github.com/&github;/releases/download/python-deps/python3-3.12.10-x86_64-1.txz</URL>
+<SHA256>89e997ce4821a4cc330ff147f3bddc4391057076b12b3acccc53066a5f60adcf</SHA256>
+</FILE>
+
 <!-- Runs on install AND on every boot (Unraid replays plg install on boot).
      Invoke via bash because /boot is a FAT filesystem that never honours
      the executable bit, so `chmod +x` is a no-op and direct execution

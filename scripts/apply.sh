@@ -20,10 +20,11 @@ TIMEOUT=60
 
 # Unraid 7.x stock does NOT include python3 in its base squashfs (it ships
 # only when NerdTools, cache-mover or a similar plugin drags it in via
-# /boot/extra/). We depend on python3 to run patch.py, so install it from a
-# pinned Slackware .txz if the user's box doesn't already have it.
-PYTHON_TXZ="/boot/extra/python3-3.12.10-x86_64-1.txz"
-PYTHON_TXZ_URL="https://github.com/jandrop/u-manager-companion/releases/download/python-deps/python3-3.12.10-x86_64-1.txz"
+# /boot/extra/). We depend on python3 to run patch.py, so install it from the
+# pinned Slackware .txz if the user's box doesn't already have it. The .plg
+# declares that .txz as a <FILE> with its SHA256, so Unraid has already
+# downloaded and verified it into $PLUGIN_DIR before this script runs.
+PYTHON_TXZ="$PLUGIN_DIR/python3-3.12.10-x86_64-1.txz"
 
 log() { echo "$LOG_PREFIX $*"; }
 
@@ -34,11 +35,9 @@ fi
 
 if ! command -v python3 >/dev/null 2>&1; then
     log "python3 not found on this Unraid (stock 7.x doesn't ship it)"
-    log "installing python3 from $PYTHON_TXZ_URL"
-    mkdir -p /boot/extra
-    if ! wget -q -O "$PYTHON_TXZ" "$PYTHON_TXZ_URL"; then
-        log "ERROR: failed to download python3 .txz from $PYTHON_TXZ_URL"
-        rm -f "$PYTHON_TXZ"
+    log "installing python3 from $PYTHON_TXZ"
+    if [ ! -f "$PYTHON_TXZ" ]; then
+        log "ERROR: $PYTHON_TXZ is missing (the .plg should have downloaded it)"
         exit 1
     fi
     if ! installpkg "$PYTHON_TXZ" >/dev/null; then
@@ -49,7 +48,7 @@ if ! command -v python3 >/dev/null 2>&1; then
         log "ERROR: python3 still not on PATH after installpkg"
         exit 1
     fi
-    log "python3 installed and persisted to /boot/extra (auto-loads on next boot)"
+    log "python3 installed (re-installed from $PYTHON_TXZ on each boot while it is missing)"
 fi
 
 # Wait up to TIMEOUT seconds for the unraid-api bundle to appear
