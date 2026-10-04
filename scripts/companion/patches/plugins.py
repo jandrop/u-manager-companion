@@ -3,15 +3,12 @@
 * `installed-plugins-manifest`: expose
   `installedUnraidPluginsDetailed` so the app gets full `.plg`
   metadata (version, latestVersion, lastCheckedAt, changelog).
-* `uninstall-plugin`: add `unraidPlugins.uninstallPlugin(filename)`
-  mutation.
 * `changelog-cdata-strip`: strip the `<![CDATA[...]]>` wrapper around
   the captured `<CHANGES>` text returned by the manifest resolver.
 """
 from __future__ import annotations
 
 import os
-import re
 
 from companion._bundle import find_bundle, find_decorator_suffix, find_metadata_suffix
 from companion._runtime import log
@@ -313,182 +310,6 @@ def patch_installed_plugins_manifest_bundle() -> bool:
     return True
 
 
-UNINSTALL_PLUGIN_MARKER = 'async uninstallPlugin(filename) {'
-
-def patch_uninstall_plugin_bundle() -> bool:
-    """Expose `unraidPlugins.uninstallPlugin(filename: String!)` mutation.
-
-    Upstream only ships `installPlugin` / `installLanguage` mutations
-    on `UnraidPluginsMutationsResolver` — there's no way to remove a
-    plugin via GraphQL. This patch wires `plugin remove FILENAME`
-    (the same script `installPlugin` already shells out to) onto the
-    existing operation pipeline so progress streams through
-    `pluginInstallUpdates` exactly like an install.
-
-    Tracked upstream: PR pending on the unraid-api fork
-    (fix/plugin-uninstall-mutation).
-    """
-    bundle = find_bundle()
-    if not bundle:
-        log("uninstall-plugin patch: bundle not found")
-        return False
-    with open(bundle, "r") as f:
-        content = f.read()
-    if UNINSTALL_PLUGIN_MARKER in content:
-        return False
-
-    # Mutations resolver scope (UnraidPluginsMutationsResolver)
-    resolver_d = find_decorator_suffix(
-        content, 'UnraidPluginsMutationsResolver.prototype, "installLanguage", null)'
-    )
-    resolver_m = find_metadata_suffix(
-        content, 'UnraidPluginsMutationsResolver.prototype, "installLanguage", null)'
-    )
-    # `_ts_param$N` is the helper that emits parameter decorators —
-    # we need the same suffix the existing `Args('input')` call uses
-    # so the new mutation's `Args('filename')` plays nicely.
-    param_anchor = '_ts_param$'
-    param_idx = content.find(
-        param_anchor,
-        content.find('UnraidPluginsMutationsResolver.prototype, "installPlugin"') - 800,
-    )
-    end = content.find('(', param_idx + len(param_anchor))
-    param_suffix = content[param_idx + len(param_anchor) : end] if param_idx != -1 else ''
-
-    if not all([resolver_d, resolver_m, param_suffix]):
-        log(
-            f"uninstall-plugin patch: missing suffix "
-            f"(resolver={resolver_d}/{resolver_m} param={param_suffix})"
-        )
-        return False
-
-    # ── PHASE A: service method on UnraidPluginsService class body ──
-    service_method = r"""    async uninstallPlugin(filename) {
-        const trimmed = filename.trim();
-        if (!trimmed) throw new Error('Plugin filename cannot be empty.');
-        if (trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('\0')) {
-            throw new Error(`Invalid plugin filename: "${filename}".`);
-        }
-        if (!trimmed.toLowerCase().endsWith('.plg')) {
-            throw new Error(`Plugin filename must end with .plg: "${filename}".`);
-        }
-        const id = randomUUID();
-        const createdAt = new Date();
-        const operation = {
-            id,
-            type: 'plugin',
-            url: trimmed,
-            name: trimmed.replace(/\.plg$/, ''),
-            status: PluginInstallStatus.RUNNING,
-            createdAt,
-            updatedAt: createdAt,
-            output: [],
-            bufferedOutput: '',
-            forced: false,
-            action: 'uninstall',
-        };
-        this.operations.set(id, operation);
-        this.logger.log(`Starting plugin uninstall for "${trimmed}" (operation ${id})`);
-        this.publishEvent(operation, []);
-        const command = await this.resolveInstallerCommand('plugin');
-        const args = ['remove', trimmed];
-        const child = execa(command, args, {
-            all: true,
-            reject: false,
-            timeout: 5 * 60 * 1000,
-        });
-        operation.child = child;
-        if (child.all) {
-            child.all.on('data', (chunk) => {
-                this.handleOutput(operation, chunk.toString());
-            });
-        } else {
-            child.stdout?.on('data', (chunk) => this.handleOutput(operation, chunk.toString()));
-            child.stderr?.on('data', (chunk) => this.handleOutput(operation, chunk.toString()));
-        }
-        child.on('error', (error) => {
-            if (operation.status === PluginInstallStatus.RUNNING) {
-                this.handleFailure(operation, error);
-            }
-        });
-        child.on('close', (code) => {
-            if (operation.status !== PluginInstallStatus.RUNNING) return;
-            if (code === 0) {
-                this.handleSuccess(operation);
-            } else {
-                this.handleFailure(operation, new Error(`plugin remove command exited with ${code}`));
-            }
-        });
-        return this.toGraphqlOperation(operation);
-    }
-"""
-    # Anchor: the `}` that closes UnraidPluginsService's class body,
-    # followed by the decorator call. Inject the method right before
-    # that closing brace.
-    service_anchor_pattern = re.compile(
-        r"(}\nUnraidPluginsService = _ts_decorate\$[\w$]+\(\[)", re.MULTILINE
-    )
-    if not service_anchor_pattern.search(content):
-        log("uninstall-plugin patch: UnraidPluginsService closer not found")
-        return False
-    content = service_anchor_pattern.sub(
-        lambda m: service_method + m.group(1), content, count=1
-    )
-
-    # ── PHASE B: resolver method body on UnraidPluginsMutationsResolver ──
-    resolver_anchor = (
-        "    async installLanguage(input) {\n"
-        "        return this.pluginsService.installLanguage(input);\n"
-        "    }\n"
-        "}"
-    )
-    if resolver_anchor not in content:
-        log("uninstall-plugin patch: resolver closer anchor not found")
-        return False
-    resolver_method = (
-        "    async installLanguage(input) {\n"
-        "        return this.pluginsService.installLanguage(input);\n"
-        "    }\n"
-        "    async uninstallPlugin(filename) {\n"
-        "        return this.pluginsService.uninstallPlugin(filename);\n"
-        "    }\n"
-        "}"
-    )
-    content = content.replace(resolver_anchor, resolver_method, 1)
-
-    # ── PHASE C: ResolveField decorator for the new method ──
-    existing_decorator_anchor = (
-        '], UnraidPluginsMutationsResolver.prototype, "installLanguage", null);'
-    )
-    if existing_decorator_anchor not in content:
-        log("uninstall-plugin patch: installLanguage decorator anchor not found")
-        return False
-    new_decorator = (
-        existing_decorator_anchor + "\n"
-        f"_ts_decorate${resolver_d}([\n"
-        f"    ResolveField(()=>PluginInstallOperation, {{\n"
-        f"        description: 'Uninstalls an Unraid plugin by .plg filename and tracks the removal through the same operation pipeline the install flow uses.'\n"
-        f"    }}),\n"
-        f"    UsePermissions({{\n"
-        f"        action: AuthAction.UPDATE_ANY,\n"
-        f"        resource: Resource.CONFIG\n"
-        f"    }}),\n"
-        f"    _ts_param${param_suffix}(0, Args('filename')),\n"
-        f"    _ts_metadata${resolver_m}(\"design:type\", Function),\n"
-        f"    _ts_metadata${resolver_m}(\"design:paramtypes\", [\n"
-        f"        String\n"
-        f"    ]),\n"
-        f"    _ts_metadata${resolver_m}(\"design:returntype\", Promise)\n"
-        f'], UnraidPluginsMutationsResolver.prototype, "uninstallPlugin", null);'
-    )
-    content = content.replace(existing_decorator_anchor, new_decorator, 1)
-
-    with open(bundle, "w") as f:
-        f.write(content)
-    log(f"enabled plugin uninstall from the app ({os.path.basename(bundle)})")
-    return True
-
-
 CHANGELOG_CDATA_OLD = (
     r"        const changesMatch = xml.match(/<CHANGES>([\s\S]*?)<\/CHANGES>/);"
 )
@@ -537,6 +358,5 @@ def patch_changelog_cdata_strip_bundle() -> bool:
 def apply() -> bool:
     return any([
         patch_installed_plugins_manifest_bundle(),
-        patch_uninstall_plugin_bundle(),
         patch_changelog_cdata_strip_bundle(),
     ])
