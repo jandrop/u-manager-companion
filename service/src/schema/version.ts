@@ -31,6 +31,8 @@ export const CAPABILITY_KEYS = [
   'plugins.uninstall',
   'plugins.checkForUpdates',
   'plugins.installedDetailed',
+  // Detection-only: this build serves plugin operation progress.
+  'plugins.installUpdates',
   'shares',
   'diskThresholds',
   'diskSmartSettings',

@@ -48,6 +48,7 @@ describe('schema.graphql', () => {
       [
         'capabilities',
         'dockerInstallOperation',
+        'pluginInstallOperation',
         'dockerTemplate',
         'shares',
         'shareSecurity',
@@ -173,13 +174,15 @@ describe('schema.graphql', () => {
     expect(fields['preselectAttributes']).not.toBe(fields['defaultNotifyAttributes']);
   });
 
-  it('declares the v1 Subscription fields (dockerInstallUpdates, dockerContainerStats)', () => {
+  it('declares the v1 Subscription fields (dockerInstallUpdates, dockerContainerStats, pluginInstallUpdates)', () => {
     const sdl = readFileSync(SDL_PATH, 'utf8');
     const schema = buildSchema(sdl);
     const subscriptionType = schema.getSubscriptionType();
     expect(subscriptionType).toBeDefined();
     const fields = subscriptionType!.getFields();
-    expect(Object.keys(fields).sort()).toEqual(['dockerContainerStats', 'dockerInstallUpdates'].sort());
+    expect(Object.keys(fields).sort()).toEqual(
+      ['dockerContainerStats', 'dockerInstallUpdates', 'pluginInstallUpdates'].sort(),
+    );
   });
 
   it('DockerContainerStatsSample declares exact-integer BigInt fields, nullable network/blkio', () => {
@@ -230,6 +233,7 @@ describe('CAPABILITY_KEYS', () => {
         'plugins.uninstall',
         'plugins.checkForUpdates',
         'plugins.installedDetailed',
+        'plugins.installUpdates',
         'shares',
         'diskThresholds',
         'diskUtilizationThresholds',
