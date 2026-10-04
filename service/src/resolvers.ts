@@ -27,7 +27,7 @@ import { GraphQLError } from 'graphql';
 import type { ResolvedIdentity } from './auth/keystore.js';
 import { isAuthorized, type CompanionOperation } from './auth/permissions.js';
 import { PermissionError } from './context.js';
-import { getSnapshot, type OperationSnapshot } from './operations/registry.js';
+import { getSnapshot, type OperationDeltaEvent, type OperationSnapshot } from './operations/registry.js';
 import { pubsub, channelFor } from './pubsub.js';
 import { getCapabilities } from './health.js';
 import type { AuditCaller } from './audit.js';
@@ -226,6 +226,22 @@ function toPluginInstallOperation(
   };
 }
 
+interface GraphqlPluginInstallEvent {
+  readonly operationId: string;
+  readonly status: string;
+  readonly output?: readonly string[];
+  readonly timestamp: string;
+}
+
+function toPluginInstallEvent(event: OperationDeltaEvent): GraphqlPluginInstallEvent {
+  return {
+    operationId: event.operationId,
+    status: event.status,
+    ...(event.output ? { output: event.output } : {}),
+    timestamp: event.timestamp.toISOString(),
+  };
+}
+
 interface GraphqlInstalledPluginManifest {
   readonly filename: string;
   readonly name: string;
@@ -360,6 +376,17 @@ export const resolvers = {
     ): GraphqlDockerInstallOperation | null {
       const snapshot = getSnapshot<DockerInstallSubject>(args.operationId);
       return snapshot ? toDockerInstallOperation(snapshot) : null;
+    },
+    // Ungated read. A docker operation id must not resolve here.
+    pluginInstallOperation(
+      _parent: unknown,
+      args: { operationId: string },
+      _context: GraphqlContext,
+    ): GraphqlPluginInstallOperation | null {
+      const snapshot = getSnapshot<PluginInstallSubject>(args.operationId);
+      return snapshot && snapshot.channelPrefix === PLUGIN_INSTALL_CHANNEL_PREFIX
+        ? toPluginInstallOperation(snapshot)
+        : null;
     },
     dockerTemplate(
       _parent: unknown,
@@ -654,6 +681,23 @@ export const resolvers = {
         return pubsub.asyncIterator(channelFor(DOCKER_INSTALL_CHANNEL_PREFIX, args.operationId));
       },
     },
+    pluginInstallUpdates: {
+      subscribe(
+        _parent: unknown,
+        args: { operationId: string },
+        _context: GraphqlContext,
+      ): AsyncIterator<unknown> {
+        const snapshot = getSnapshot(args.operationId);
+        if (!snapshot || snapshot.channelPrefix !== PLUGIN_INSTALL_CHANNEL_PREFIX) {
+          throw new GraphQLError(`Unknown plugin install operation: ${args.operationId}`);
+        }
+        return pubsub.asyncIterator(channelFor(PLUGIN_INSTALL_CHANNEL_PREFIX, args.operationId));
+      },
+      // The published payload is the event itself, not keyed by field name.
+      resolve(payload: OperationDeltaEvent): GraphqlPluginInstallEvent {
+        return toPluginInstallEvent(payload);
+      },
+    },
     // Read-only -- NOT permission-gated, same posture as the other read
     // resolvers (installedUnraidPluginsDetailed, diskThresholds).
     dockerContainerStats: {
@@ -680,12 +724,3 @@ export const resolvers = {
     PATH: 'Path', PORT: 'Port', VARIABLE: 'Variable', LABEL: 'Label', DEVICE: 'Device',
   } satisfies Record<string, DockerConfigEntryTypeXml>,
 };
-
-/** Exported for server.ts -- the plugin-install channel prefix used by a
- * future pluginInstallUpdates subscription, kept alongside resolvers.ts
- * since it is resolver-map-adjacent wiring, not feature business logic.
- * Not yet wired to an SDL Subscription field -- v1's schema.graphql only
- * exposes dockerInstallUpdates (plugin uninstall progress is observable
- * via the returned PluginInstallOperation's output snapshot + polling
- * dockerInstallOperation-equivalent, matching v1 scope). */
-export { PLUGIN_INSTALL_CHANNEL_PREFIX };

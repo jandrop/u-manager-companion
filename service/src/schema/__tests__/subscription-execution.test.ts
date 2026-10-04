@@ -11,6 +11,7 @@ import { buildExecutableSchema } from '../build-schema.js';
 import type { GraphqlContext } from '../../resolvers.js';
 import type { ResolvedIdentity } from '../../auth/keystore.js';
 import type { DockerContainerStatsSample } from '../../features/docker_stats/map.js';
+import { appendLine, createOperation } from '../../operations/registry.js';
 
 const DOCUMENT = parse(`subscription { dockerContainerStats { id cpuPercent memUsedBytes memTotalBytes } }`);
 
@@ -73,5 +74,53 @@ describe('dockerContainerStats -- executed through graphql.subscribe()', () => {
     // of establishing a silent stream.
     expect(Symbol.asyncIterator in result).toBe(false);
     expect((result as ExecutionResult).errors?.[0]?.message).toMatch(/Docker engine unreachable/);
+  });
+});
+
+describe('pluginInstallUpdates -- executed through graphql.subscribe()', () => {
+  it('delivers a real delta event, with timestamp serialized as ISO 8601', async () => {
+    const schema = buildExecutableSchema();
+    const snapshot = createOperation('PLUGIN_INSTALL', { name: 'my-plugin', url: 'my-plugin.plg' });
+    const document = parse(
+      `subscription { pluginInstallUpdates(operationId: "${snapshot.id}") { operationId status output timestamp } }`,
+    );
+    const context: GraphqlContext = {
+      identity: makeIdentity(),
+      deps: {} as unknown as GraphqlContext['deps'],
+    };
+
+    const result = await subscribe({ schema, document, contextValue: context });
+    expect(Symbol.asyncIterator in result).toBe(true);
+    const iterator = result as AsyncGenerator<ExecutionResult>;
+
+    const nextEvent = iterator.next();
+    appendLine(snapshot.id, 'Removing plugin...');
+    const { value } = await nextEvent;
+
+    expect(value.errors).toBeUndefined();
+    const event = value.data?.['pluginInstallUpdates'] as Record<string, unknown>;
+    expect(event).toMatchObject({
+      operationId: snapshot.id,
+      status: 'RUNNING',
+      output: ['Removing plugin...'],
+    });
+    expect(event['timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it('rejects an operation id from the docker channel', async () => {
+    const schema = buildExecutableSchema();
+    const dockerSnapshot = createOperation('DOCKER_INSTALL', { containerName: 'plex', repository: 'r' });
+    const document = parse(
+      `subscription { pluginInstallUpdates(operationId: "${dockerSnapshot.id}") { operationId } }`,
+    );
+    const context: GraphqlContext = {
+      identity: makeIdentity(),
+      deps: {} as unknown as GraphqlContext['deps'],
+    };
+
+    const result = await subscribe({ schema, document, contextValue: context });
+
+    expect(Symbol.asyncIterator in result).toBe(false);
+    expect((result as ExecutionResult).errors?.[0]?.message).toMatch(/Unknown plugin install operation/);
   });
 });

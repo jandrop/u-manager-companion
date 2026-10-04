@@ -54,6 +54,13 @@ describe('OPERATION_PERMISSIONS', () => {
     });
   });
 
+  it('maps plugin install-updates to CONFIG:update, matching the other plugin keys', () => {
+    expect(OPERATION_PERMISSIONS['plugins.installUpdates']).toEqual({
+      resource: 'CONFIG',
+      action: 'update',
+    });
+  });
+
   it('maps diskThresholds (the mutation) to the DISPLAY resource, update action', () => {
     expect(OPERATION_PERMISSIONS['diskThresholds']).toEqual({
       resource: 'DISPLAY',
