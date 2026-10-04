@@ -30,15 +30,16 @@ export type StreamedProcessRunner = (
 ) => Promise<StreamedProcessResult>;
 
 /**
- * Production StreamedProcessRunner: shells to `command` via execa with
- * merged stdout/stderr (`all: true`), buffering partial lines across chunk
- * boundaries via an `onChunk` closure. `reject: false` so a non-zero exit
+ * Production StreamedProcessRunner: runs `command` via execa with merged
+ * stdout/stderr (`all: true`), buffering partial lines across chunk
+ * boundaries via an `onChunk` closure. No shell: arguments carry
+ * user-supplied names and must reach the command verbatim. `reject: false` so a non-zero exit
  * surfaces as a normal StreamedProcessResult instead of a thrown
  * ExecaError -- callers branch on `exitCode` and throw at the call site
  * instead of here.
  */
 export const runStreamedProcess: StreamedProcessRunner = async (command, args, onLine) => {
-  const child = execa(command, args, { all: true, reject: false, shell: true });
+  const child = execa(command, args, { all: true, reject: false });
 
   let buffer = '';
   const onChunk = (chunk: Buffer | string): void => {
