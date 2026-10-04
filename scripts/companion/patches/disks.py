@@ -16,7 +16,8 @@ import re
 from companion._bundle import find_bundle
 from companion._runtime import log
 
-DISKS_SERVICE_MARKER = "/* u-manager-companion: disks-service no-wake */"
+DISKS_SERVICE_MARKER = "/* u-manager-companion: disks-service no-wake v2 */"
+LEGACY_DISKS_SERVICE_MARKER = "/* u-manager-companion: disks-service no-wake */"
 
 def patch_disks_service_bundle() -> bool:
     """Reimplement `DisksService.getDisks` so it never wakes spun-down
@@ -55,6 +56,15 @@ def patch_disks_service_bundle() -> bool:
         content = f.read()
     if DISKS_SERVICE_MARKER in content:
         return False
+
+    # A leftover v1 runs after v2 and overrides it.
+    content = re.sub(
+        r"\n" + re.escape(LEGACY_DISKS_SERVICE_MARKER) + r"\n.*?\n\}\)\(\);\n",
+        "",
+        content,
+        count=1,
+        flags=re.DOTALL,
+    )
 
     anchor_re = re.compile(
         r"DisksService = _ts_decorate\$[\w$]+\(\[\s*Injectable\(\)\s*,",
@@ -129,7 +139,7 @@ def patch_disks_service_bundle() -> bool:
     }
 
     async function listDisksViaLsblk() {
-        const { stdout } = await execa('lsblk', ['-d', '-J', '-O']);
+        const { stdout } = await execa('lsblk', ['-d', '-b', '-J', '-O']);
         let parsed;
         try { parsed = JSON.parse(stdout); } catch (e) { return []; }
         const devices = Array.isArray(parsed?.blockdevices) ? parsed.blockdevices : [];

@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.09.19.1">
+<!ENTITY version "2026.10.04.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -15,6 +15,11 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.04.1
+- Fixed disk sizes being reported as a few bytes (a 1 TB drive showed as
+  "931 B"), which made Unraid's Internal Boot wizard reject drives as too
+  small.
+
 ###2026.09.19.1
 - Fixed the per-disk SMART notification tolerance not being kept when set to
   Absolute. The disk used the global value instead.
