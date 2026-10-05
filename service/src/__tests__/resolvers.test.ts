@@ -1,3 +1,4 @@
+import { GraphQLError } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 import type { ResolvedIdentity } from '../auth/keystore.js';
 import { PermissionError } from '../context.js';
@@ -204,6 +205,41 @@ describe('resolvers.Query.dockerInstallOperation', () => {
     const context = makeContext();
     const result = resolvers.Query.dockerInstallOperation({}, { operationId: 'nope' }, context);
     expect(result).toBeNull();
+  });
+});
+
+describe('resolvers.Query.pluginInstallOperation', () => {
+  it('maps a plugin install snapshot to the GraphQL shape', () => {
+    const snapshot = createOperation('PLUGIN_INSTALL', { name: 'my-plugin', url: 'my-plugin.plg' });
+    const context = makeContext();
+
+    const result = resolvers.Query.pluginInstallOperation({}, { operationId: snapshot.id }, context);
+
+    expect(result).toMatchObject({ id: snapshot.id, name: 'my-plugin', url: 'my-plugin.plg' });
+  });
+
+  it('returns null for an unknown operation id', () => {
+    const context = makeContext();
+    const result = resolvers.Query.pluginInstallOperation({}, { operationId: 'nope' }, context);
+    expect(result).toBeNull();
+  });
+
+  it('returns null for a docker install operation id (different channel)', () => {
+    const dockerSnapshot = createOperation('DOCKER_INSTALL', { containerName: 'plex', repository: 'r' });
+    const context = makeContext();
+
+    const result = resolvers.Query.pluginInstallOperation({}, { operationId: dockerSnapshot.id }, context);
+
+    expect(result).toBeNull();
+  });
+
+  it('is NOT permission-gated -- a read-only caller can call it', () => {
+    const snapshot = createOperation('PLUGIN_INSTALL', { name: 'my-plugin', url: 'my-plugin.plg' });
+    const context = makeContext({}, makeIdentity('read-only'));
+
+    const result = resolvers.Query.pluginInstallOperation({}, { operationId: snapshot.id }, context);
+
+    expect(result).toMatchObject({ id: snapshot.id });
   });
 });
 
@@ -421,6 +457,55 @@ describe('resolvers.Subscription.dockerInstallUpdates', () => {
 
     expect(publishSpy).toHaveBeenCalledWith(channelFor('DOCKER_INSTALL', snapshot.id));
     publishSpy.mockRestore();
+  });
+});
+
+describe('resolvers.Subscription.pluginInstallUpdates', () => {
+  it('subscribes to the channel derived from the operation id', () => {
+    const snapshot = createOperation('PLUGIN_INSTALL', { name: 'my-plugin', url: 'my-plugin.plg' });
+    const context = makeContext();
+    const publishSpy = vi.spyOn(pubsub, 'asyncIterator');
+
+    resolvers.Subscription.pluginInstallUpdates.subscribe({}, { operationId: snapshot.id }, context);
+
+    expect(publishSpy).toHaveBeenCalledWith(channelFor('PLUGIN_INSTALL', snapshot.id));
+    publishSpy.mockRestore();
+  });
+
+  it('throws for an unknown operation id', () => {
+    const context = makeContext();
+    expect(() =>
+      resolvers.Subscription.pluginInstallUpdates.subscribe({}, { operationId: 'nope' }, context),
+    ).toThrow(GraphQLError);
+  });
+
+  it('throws for a docker install operation id (different channel)', () => {
+    const dockerSnapshot = createOperation('DOCKER_INSTALL', { containerName: 'plex', repository: 'r' });
+    const context = makeContext();
+
+    expect(() =>
+      resolvers.Subscription.pluginInstallUpdates.subscribe(
+        {},
+        { operationId: dockerSnapshot.id },
+        context,
+      ),
+    ).toThrow(GraphQLError);
+  });
+
+  it('resolve() maps the delta event to the GraphQL shape, formatting timestamp as ISO', () => {
+    const event = {
+      operationId: 'op-1',
+      status: 'RUNNING' as const,
+      output: ['line one'],
+      timestamp: new Date('2026-01-01T00:00:00.000Z'),
+    };
+
+    expect(resolvers.Subscription.pluginInstallUpdates.resolve(event)).toEqual({
+      operationId: 'op-1',
+      status: 'RUNNING',
+      output: ['line one'],
+      timestamp: '2026-01-01T00:00:00.000Z',
+    });
   });
 });
 

@@ -3,7 +3,7 @@
 <!ENTITY name "u-manager-companion">
 <!ENTITY displayName "U-Manager Companion">
 <!ENTITY author "jandrop">
-<!ENTITY version "2026.10.04.1">
+<!ENTITY version "2026.10.05.1">
 <!ENTITY plgdir "/boot/config/plugins/&name;">
 <!ENTITY github "jandrop/u-manager-companion">
 <!ENTITY pluginURL "https://github.com/&github;/releases/latest/download/UManagerCompanion.plg">
@@ -15,6 +15,16 @@
 
 <CHANGES>
 <![CDATA[
+###2026.10.05.1
+- Plugin uninstall, the plugin update check and the installed plugin
+  details are now served only by the companion's own endpoint. The
+  companion no longer modifies Unraid's API for them.
+- Added progress tracking for plugin uninstalls on the companion endpoint.
+- Fixed Docker install and update progress not arriving live from the
+  companion endpoint.
+- The python3 package the companion installs on servers without it is
+  now checked against a pinned SHA256 before it is installed.
+
 ###2026.10.04.1
 - Fixed disk sizes being reported as a few bytes (a 1 TB drive showed as
   "931 B"), which made Unraid's Internal Boot wizard reject drives as too

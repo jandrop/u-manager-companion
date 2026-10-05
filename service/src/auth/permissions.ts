@@ -74,6 +74,8 @@ export const OPERATION_PERMISSIONS: Readonly<Record<CompanionOperation, Required
   // entry exists only because OPERATION_PERMISSIONS is a total map over
   // CapabilityKey.
   'plugins.installedDetailed': { resource: 'CONFIG', action: 'update' },
+  // Never checked: both fields are ungated reads.
+  'plugins.installUpdates': { resource: 'CONFIG', action: 'update' },
   shares: { resource: 'SHARE', action: 'update' },
   diskThresholds: { resource: 'DISPLAY', action: 'update' },
   // Gates updateDiskSmartSettings/resetDiskSmartSettings only; the
