@@ -226,14 +226,14 @@ function toPluginInstallOperation(
   };
 }
 
-interface GraphqlPluginInstallEvent {
+interface GraphqlInstallEvent {
   readonly operationId: string;
   readonly status: string;
   readonly output?: readonly string[];
   readonly timestamp: string;
 }
 
-function toPluginInstallEvent(event: OperationDeltaEvent): GraphqlPluginInstallEvent {
+function toInstallEvent(event: OperationDeltaEvent): GraphqlInstallEvent {
   return {
     operationId: event.operationId,
     status: event.status,
@@ -680,6 +680,10 @@ export const resolvers = {
         }
         return pubsub.asyncIterator(channelFor(DOCKER_INSTALL_CHANNEL_PREFIX, args.operationId));
       },
+      // The published payload is the event itself, not keyed by field name.
+      resolve(payload: OperationDeltaEvent): GraphqlInstallEvent {
+        return toInstallEvent(payload);
+      },
     },
     pluginInstallUpdates: {
       subscribe(
@@ -694,8 +698,8 @@ export const resolvers = {
         return pubsub.asyncIterator(channelFor(PLUGIN_INSTALL_CHANNEL_PREFIX, args.operationId));
       },
       // The published payload is the event itself, not keyed by field name.
-      resolve(payload: OperationDeltaEvent): GraphqlPluginInstallEvent {
-        return toPluginInstallEvent(payload);
+      resolve(payload: OperationDeltaEvent): GraphqlInstallEvent {
+        return toInstallEvent(payload);
       },
     },
     // Read-only -- NOT permission-gated, same posture as the other read
