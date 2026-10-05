@@ -21,9 +21,10 @@ TIMEOUT=60
 # Unraid 7.x stock does NOT include python3 in its base squashfs (it ships
 # only when NerdTools, cache-mover or a similar plugin drags it in via
 # /boot/extra/). We depend on python3 to run patch.py, so install it from a
-# pinned Slackware .txz if the user's box doesn't already have it.
+# Slackware .txz pinned by SHA256 if the user's box doesn't already have it.
 PYTHON_TXZ="/boot/extra/python3-3.12.10-x86_64-1.txz"
 PYTHON_TXZ_URL="https://github.com/jandrop/u-manager-companion/releases/download/python-deps/python3-3.12.10-x86_64-1.txz"
+PYTHON_TXZ_SHA256="89e997ce4821a4cc330ff147f3bddc4391057076b12b3acccc53066a5f60adcf"
 
 log() { echo "$LOG_PREFIX $*"; }
 
@@ -35,10 +36,23 @@ fi
 if ! command -v python3 >/dev/null 2>&1; then
     log "python3 not found on this Unraid (stock 7.x doesn't ship it)"
     log "installing python3 from $PYTHON_TXZ_URL"
-    mkdir -p /boot/extra
-    if ! wget -q -O "$PYTHON_TXZ" "$PYTHON_TXZ_URL"; then
+    # Verified before it reaches /boot/extra: Unraid installs anything there
+    # as root on every boot.
+    PYTHON_TXZ_TMP="$(mktemp /tmp/u-manager-companion-python.XXXXXX)"
+    if ! wget -q -O "$PYTHON_TXZ_TMP" "$PYTHON_TXZ_URL"; then
         log "ERROR: failed to download python3 .txz from $PYTHON_TXZ_URL"
-        rm -f "$PYTHON_TXZ"
+        rm -f "$PYTHON_TXZ_TMP"
+        exit 1
+    fi
+    if ! echo "$PYTHON_TXZ_SHA256  $PYTHON_TXZ_TMP" | sha256sum -c --status; then
+        log "ERROR: python3 .txz does not match the pinned SHA256, not installing it"
+        rm -f "$PYTHON_TXZ_TMP"
+        exit 1
+    fi
+    mkdir -p /boot/extra
+    if ! mv "$PYTHON_TXZ_TMP" "$PYTHON_TXZ"; then
+        log "ERROR: could not move python3 .txz to $PYTHON_TXZ"
+        rm -f "$PYTHON_TXZ_TMP"
         exit 1
     fi
     if ! installpkg "$PYTHON_TXZ" >/dev/null; then
