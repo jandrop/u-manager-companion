@@ -77,6 +77,37 @@ describe('dockerContainerStats -- executed through graphql.subscribe()', () => {
   });
 });
 
+describe('dockerInstallUpdates -- executed through graphql.subscribe()', () => {
+  it('delivers a real delta event, with timestamp serialized as ISO 8601', async () => {
+    const schema = buildExecutableSchema();
+    const snapshot = createOperation('DOCKER_INSTALL', { containerName: 'plex', repository: 'r' });
+    const document = parse(
+      `subscription { dockerInstallUpdates(operationId: "${snapshot.id}") { operationId status output timestamp } }`,
+    );
+    const context: GraphqlContext = {
+      identity: makeIdentity(),
+      deps: {} as unknown as GraphqlContext['deps'],
+    };
+
+    const result = await subscribe({ schema, document, contextValue: context });
+    expect(Symbol.asyncIterator in result).toBe(true);
+    const iterator = result as AsyncGenerator<ExecutionResult>;
+
+    const nextEvent = iterator.next();
+    appendLine(snapshot.id, 'Pulling image...');
+    const { value } = await nextEvent;
+
+    expect(value.errors).toBeUndefined();
+    const event = value.data?.['dockerInstallUpdates'] as Record<string, unknown>;
+    expect(event).toMatchObject({
+      operationId: snapshot.id,
+      status: 'RUNNING',
+      output: ['Pulling image...'],
+    });
+    expect(event['timestamp']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+});
+
 describe('pluginInstallUpdates -- executed through graphql.subscribe()', () => {
   it('delivers a real delta event, with timestamp serialized as ISO 8601', async () => {
     const schema = buildExecutableSchema();
