@@ -295,8 +295,7 @@ def _edit_service_iife() -> str:
     Shares the `DOCKER_INSTALL:` channel prefix with the install runtime
     so the existing `dockerInstallUpdates(opId)` subscription works
     transparently for edit ops too. Wraps `__dockerInstall.getOperation`
-    + `.subscribe` to fall through to this runtime — same pattern
-    `docker_update_stream.py` uses for update ops.
+    + `.subscribe` to fall through to this runtime.
     """
     return r""";(() => {
     if (globalThis.__dockerEdit) return; // idempotent
@@ -304,9 +303,7 @@ def _edit_service_iife() -> str:
     // Wrap __dockerInstall.getOperation / .subscribe so the existing
     // dockerInstallOperation query + dockerInstallUpdates subscription
     // (registered by docker_template_create.py) also resolve operations
-    // owned by THIS edit runtime. Idempotent via __umEditWrapped sentinel
-    // — distinct from __umWrapped used by docker_update_stream so the two
-    // wraps can coexist.
+    // owned by THIS edit runtime. Idempotent via __umEditWrapped sentinel.
     if (globalThis.__dockerInstall && !globalThis.__dockerInstall.__umEditWrapped) {
         const prevGetOp = globalThis.__dockerInstall.getOperation;
         globalThis.__dockerInstall.getOperation = function(id) {
