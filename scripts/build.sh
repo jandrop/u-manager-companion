@@ -61,7 +61,7 @@ cd scripts
     --no-xattrs \
     --exclude='__pycache__' \
     --exclude='._*' \
-    -cf - patch.py apply.sh watcher.sh service-supervisor.sh nginx-cleanup.sh companion \
+    -cf - patch.py apply.sh watcher.sh service-supervisor.sh nginx-cleanup.sh rebuild_container_ts.php companion \
          -C .. assets/icon.png \
   | gzip -n -9 > "../${OUT}"
 cd ..

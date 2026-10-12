@@ -490,6 +490,10 @@ mkdir -p /usr/local/emhttp/plugins/&name;/service
 cp &plgdir;/assets/icon.png /usr/local/emhttp/plugins/&name;/&name;.png
 cp &plgdir;/service/bundle.cjs /usr/local/emhttp/plugins/&name;/service/bundle.cjs
 
+# The service executes it directly, and /boot (FAT) cannot hold an exec bit.
+cp &plgdir;/rebuild_container_ts.php /usr/local/emhttp/plugins/&name;/rebuild_container_ts.php
+chmod +x /usr/local/emhttp/plugins/&name;/rebuild_container_ts.php
+
 # Step 3: run the legacy patch pipeline fresh (dual-mode) --
 # after step 1's pkill, so apply.sh's own pgrep guard spawns a genuinely
 # fresh watcher instead of declining because a stale one looked "running".

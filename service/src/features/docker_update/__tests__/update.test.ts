@@ -192,6 +192,28 @@ describe('updateContainerStream', () => {
       expect(getSnapshot(op.id)?.status).toBe('FAILED');
     });
   });
+
+  it('runs the companion rebuild_container script, not Unraid\'s native one', async () => {
+    const runRebuildContainer = makeFakeRebuild();
+
+    const op = updateContainerStream('plex', {
+      dockerClient: makeFakeDockerClient(),
+      runRebuildContainer,
+      audit: makeFakeAudit(),
+      caller: { id: 'u1', name: 'admin' },
+      updateStatusPath,
+      dockerWebuiInfoPath,
+    });
+
+    await vi.waitFor(() => {
+      expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+    });
+    expect(runRebuildContainer).toHaveBeenCalledWith(
+      '/usr/local/emhttp/plugins/u-manager-companion/rebuild_container_ts.php',
+      ['plex'],
+      expect.any(Function),
+    );
+  });
 });
 
 describe('updateAllContainersStream', () => {
@@ -256,6 +278,44 @@ describe('updateAllContainersStream', () => {
     });
     const joined = (getSnapshot(op.id)?.output ?? []).join('\n');
     expect(joined).toContain('sonarr');
+  });
+
+  it('runs the companion rebuild_container script for every target', async () => {
+    const runRebuildContainer = makeFakeRebuild();
+    // The default fake's inspect() always reports Name '/plex', so to tell
+    // each target's call apart the mock must reflect the requested name.
+    const dockerClient = makeFakeDockerClient({
+      getContainer: vi.fn((name: string) => ({
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        remove: vi.fn().mockResolvedValue(undefined),
+        inspect: vi.fn().mockResolvedValue(makeContainerInspect({ Name: `/${name}` })),
+      })),
+    });
+
+    const op = updateAllContainersStream({
+      dockerClient,
+      runRebuildContainer,
+      listUpdatableContainerNames: vi.fn().mockResolvedValue(['plex', 'sonarr']),
+      audit: makeFakeAudit(),
+      caller: { id: 'u1', name: 'admin' },
+      updateStatusPath,
+      dockerWebuiInfoPath,
+    });
+
+    await vi.waitFor(() => {
+      expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+    });
+    expect(runRebuildContainer).toHaveBeenCalledWith(
+      '/usr/local/emhttp/plugins/u-manager-companion/rebuild_container_ts.php',
+      ['plex'],
+      expect.any(Function),
+    );
+    expect(runRebuildContainer).toHaveBeenCalledWith(
+      '/usr/local/emhttp/plugins/u-manager-companion/rebuild_container_ts.php',
+      ['sonarr'],
+      expect.any(Function),
+    );
   });
 });
 
