@@ -227,6 +227,29 @@ describe('installDockerTemplate', () => {
     expect(writeTemplateFile).toHaveBeenCalledWith('plex', expect.stringContaining('<MyIP>192.168.1.50</MyIP>'));
   });
 
+  it('runs the companion rebuild_container script, not Unraid\'s native one', async () => {
+    const runRebuildContainer = makeFakeRebuild();
+    const writeTemplateFile: WriteTemplateFile = vi.fn().mockResolvedValue(undefined);
+    const audit = makeFakeAudit();
+
+    const op = installDockerTemplate(baseInput, {
+      dockerClient: makeFakeDockerClient(),
+      runRebuildContainer,
+      writeTemplateFile,
+      audit,
+      caller: { id: 'u1', name: 'admin' },
+    });
+
+    await vi.waitFor(() => {
+      expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+    });
+    expect(runRebuildContainer).toHaveBeenCalledWith(
+      '/usr/local/emhttp/plugins/u-manager-companion/rebuild_container_ts.php',
+      ['plex'],
+      expect.any(Function),
+    );
+  });
+
   it('transitions to FAILED when writing the template file rejects', async () => {
     const writeTemplateFile: WriteTemplateFile = vi.fn().mockRejectedValue(new Error('disk full'));
     const audit = makeFakeAudit();

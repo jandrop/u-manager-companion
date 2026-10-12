@@ -181,6 +181,28 @@ describe('editDockerTemplate', () => {
     expect(pull).toHaveBeenCalled();
   });
 
+  it('runs the companion rebuild_container script, not Unraid\'s native one', async () => {
+    const runRebuildContainer = makeFakeRebuild();
+
+    const op = editDockerTemplate(baseInput, {
+      dockerClient: makeFakeDockerClient(),
+      runRebuildContainer,
+      writeTemplateFile: vi.fn().mockResolvedValue(undefined),
+      readTemplateFile: makeFakeReadTemplateFile(),
+      audit: makeFakeAudit(),
+      caller: { id: 'u1', name: 'admin' },
+    });
+
+    await vi.waitFor(() => {
+      expect(getSnapshot(op.id)?.status).toBe('SUCCEEDED');
+    });
+    expect(runRebuildContainer).toHaveBeenCalledWith(
+      '/usr/local/emhttp/plugins/u-manager-companion/rebuild_container_ts.php',
+      ['plex'],
+      expect.any(Function),
+    );
+  });
+
   it('does not call start() after rebuild -- rebuild_container handles autostart, calling start() would resurrect a stopped container', async () => {
     const start = vi.fn();
     const dockerClient = makeFakeDockerClient({

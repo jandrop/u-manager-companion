@@ -38,8 +38,10 @@ import {
 export const DOCKER_INSTALL_CHANNEL_PREFIX = 'DOCKER_INSTALL';
 
 export const TEMPLATES_USER_DIR = '/boot/config/plugins/dockerMan/templates-user';
+/** Not Unraid's rebuild_container, which drops the Tailscale hook's
+ * ORG_ENTRYPOINT/ORG_CMD. */
 export const REBUILD_CONTAINER_CLI =
-  '/usr/local/emhttp/plugins/dynamix.docker.manager/scripts/rebuild_container';
+  '/usr/local/emhttp/plugins/u-manager-companion/rebuild_container_ts.php';
 
 export interface DockerInstallSubject {
   readonly containerName: string;
